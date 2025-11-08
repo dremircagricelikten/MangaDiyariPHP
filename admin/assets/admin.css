@@ -1,0 +1,15 @@
+body {
+  min-height: 100vh;
+}
+
+.bg-gradient {
+  background: linear-gradient(120deg, #141e30, #243b55);
+}
+
+.card {
+  border-radius: 1rem;
+}
+
+textarea {
+  resize: vertical;
+}

@@ -1,0 +1,7 @@
+/vendor/
+/data/*.sqlite
+/.env
+/node_modules/
+.DS_Store
+/public/uploads/
+/composer.lock
