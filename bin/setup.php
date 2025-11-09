@@ -27,9 +27,28 @@ $pdo->exec('CREATE TABLE IF NOT EXISTS users (
     email TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL DEFAULT "member",
+    bio TEXT DEFAULT "",
+    avatar_url TEXT,
+    website_url TEXT,
+    is_active INTEGER NOT NULL DEFAULT 1,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 )');
+
+$userColumns = [
+    'bio TEXT DEFAULT ""',
+    'avatar_url TEXT',
+    'website_url TEXT',
+    'is_active INTEGER NOT NULL DEFAULT 1'
+];
+
+foreach ($userColumns as $definition) {
+    try {
+        $pdo->exec('ALTER TABLE users ADD COLUMN ' . $definition);
+    } catch (Throwable $exception) {
+        // Sütun zaten mevcutsa hata yoksayılır.
+    }
+}
 
 $pdo->exec('CREATE TABLE IF NOT EXISTS mangas (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -103,6 +122,18 @@ $defaultTheme = [
 ];
 
 $settingRepo->setMany(array_diff_key($defaultTheme, $settingRepo->all()));
+
+$ftpDefaults = [
+    'ftp_host' => '',
+    'ftp_port' => '21',
+    'ftp_username' => '',
+    'ftp_password' => '',
+    'ftp_root' => '/',
+    'ftp_passive' => '1',
+];
+
+$existingSettings = $settingRepo->all();
+$settingRepo->setMany(array_diff_key($ftpDefaults, $existingSettings));
 
 $defaultWidgets = [
     'popular_slider' => [

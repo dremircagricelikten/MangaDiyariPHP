@@ -231,4 +231,158 @@ $(function () {
 
   loadThemeSettings();
   loadWidgets();
+
+  function renderUserRow(user) {
+    const initial = (user.username || '?').charAt(0).toUpperCase();
+    const avatar = user.avatar_url
+      ? `<img src="${user.avatar_url}" alt="${user.username}" class="rounded-circle me-2" width="36" height="36">`
+      : `<div class="avatar-placeholder rounded-circle me-2">${initial}</div>`;
+    const active = Number(user.is_active) === 1;
+    return `
+      <tr data-user-id="${user.id}">
+        <td>
+          <div class="d-flex align-items-center">
+            ${avatar}
+            <div>
+              <div class="fw-semibold">${user.username}</div>
+              <div class="small text-muted">${user.email}</div>
+            </div>
+          </div>
+        </td>
+        <td>
+          <select class="form-select form-select-sm user-role">
+            <option value="member" ${user.role === 'member' ? 'selected' : ''}>Üye</option>
+            <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editör</option>
+            <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Yönetici</option>
+          </select>
+        </td>
+        <td class="text-center">
+          <div class="form-check form-switch d-flex justify-content-center">
+            <input class="form-check-input user-active" type="checkbox" ${active ? 'checked' : ''}>
+          </div>
+        </td>
+        <td>
+          <div class="input-group input-group-sm">
+            <input type="password" class="form-control user-password" placeholder="Yeni parola">
+            <button class="btn btn-outline-light user-save" type="button">Kaydet</button>
+          </div>
+          <div class="user-message small mt-1 text-muted"></div>
+        </td>
+      </tr>
+    `;
+  }
+
+  function loadUsers() {
+    const tableBody = $('#user-table tbody');
+    tableBody.html('<tr><td colspan="4" class="text-center text-muted">Yükleniyor...</td></tr>');
+    $.getJSON('api.php', { action: 'list-users' })
+      .done(({ data }) => {
+        tableBody.empty();
+        if (!data.length) {
+          tableBody.html('<tr><td colspan="4" class="text-center text-muted">Henüz üye bulunmuyor.</td></tr>');
+          return;
+        }
+        data.forEach((user) => {
+          tableBody.append(renderUserRow(user));
+        });
+      })
+      .fail(() => {
+        tableBody.html('<tr><td colspan="4" class="text-center text-danger">Üyeler yüklenemedi.</td></tr>');
+      });
+  }
+
+  $('#create-user-form').on('submit', function (event) {
+    event.preventDefault();
+    const form = $(this);
+    const message = $('#create-user-message');
+    message.empty();
+
+    const payload = form.serializeArray();
+    if (!form.find('[name="is_active"]').is(':checked')) {
+      payload.push({ name: 'is_active', value: '0' });
+    }
+
+    $.post('api.php?action=create-user', $.param(payload))
+      .done((response) => {
+        message.html(`<div class="alert alert-success">${response.message}</div>`);
+        form.trigger('reset');
+        loadUsers();
+      })
+      .fail((xhr) => handleError(xhr, message));
+  });
+
+  $(document).on('click', '.user-save', function () {
+    const row = $(this).closest('tr');
+    const userId = row.data('user-id');
+    const role = row.find('.user-role').val();
+    const isActive = row.find('.user-active').is(':checked') ? 1 : 0;
+    const password = row.find('.user-password').val();
+    const message = row.find('.user-message');
+
+    message.removeClass('text-success text-danger').text('Kaydediliyor...');
+
+    $.post('api.php?action=update-user', {
+      id: userId,
+      role,
+      is_active: isActive,
+      password,
+    })
+      .done((response) => {
+        message.addClass('text-success').text(response.message);
+        row.find('.user-password').val('');
+      })
+      .fail((xhr) => {
+        if (xhr.status === 403) {
+          window.location.href = 'login.php';
+          return;
+        }
+        const error = xhr.responseJSON?.error || 'Güncelleme başarısız';
+        message.addClass('text-danger').text(error);
+      });
+  });
+
+  function loadFtpSettings() {
+    const form = $('#ftp-form');
+    $.getJSON('api.php', { action: 'get-ftp-settings' })
+      .done(({ data }) => {
+        Object.entries(data || {}).forEach(([key, value]) => {
+          const field = form.find(`[name="${key}"]`);
+          if (!field.length) {
+            return;
+          }
+          if (field.attr('type') === 'checkbox') {
+            field.prop('checked', value === '1' || value === 1);
+          } else {
+            field.val(value);
+          }
+        });
+      });
+  }
+
+  $('#ftp-form').on('submit', function (event) {
+    event.preventDefault();
+    const form = $(this);
+    const message = $('#ftp-form-message');
+    message.removeClass('text-danger text-success').text('Kaydediliyor...');
+    const payload = form.serializeArray();
+    const passiveField = form.find('[name="ftp_passive"]');
+    if (!passiveField.is(':checked')) {
+      payload.push({ name: 'ftp_passive', value: '0' });
+    }
+    $.post('api.php?action=update-ftp-settings', $.param(payload))
+      .done((response) => {
+        message.removeClass('text-danger').addClass('text-success').text(response.message);
+      })
+      .fail((xhr) => {
+        if (xhr.status === 403) {
+          window.location.href = 'login.php';
+          return;
+        }
+        const error = xhr.responseJSON?.error || 'Kaydetme başarısız';
+        message.removeClass('text-success').addClass('text-danger').text(error);
+      });
+  });
+
+  loadUsers();
+  loadFtpSettings();
 });
