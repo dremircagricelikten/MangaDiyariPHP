@@ -114,6 +114,56 @@ $user = Auth::user();
           </div>
         </div>
       </div>
+
+      <div class="row g-4 mt-1">
+        <div class="col-lg-5">
+          <div class="card bg-secondary border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h2 class="h4 mb-3">Tema Ayarları</h2>
+              <p class="text-muted small">Renk paletini değiştirerek sitenin görünümünü özelleştirebilirsiniz.</p>
+              <form id="theme-form" class="row g-3">
+                <div class="col-md-6">
+                  <label class="form-label" for="primary_color">Birincil Renk</label>
+                  <input type="color" class="form-control form-control-color" id="primary_color" name="primary_color" value="#5f2c82">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="accent_color">Vurgu Rengi</label>
+                  <input type="color" class="form-control form-control-color" id="accent_color" name="accent_color" value="#49a09d">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="background_color">Arkaplan Rengi</label>
+                  <input type="color" class="form-control form-control-color" id="background_color" name="background_color" value="#05060c">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="gradient_start">Gradyan Başlangıcı</label>
+                  <input type="color" class="form-control form-control-color" id="gradient_start" name="gradient_start" value="#5f2c82">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label" for="gradient_end">Gradyan Bitişi</label>
+                  <input type="color" class="form-control form-control-color" id="gradient_end" name="gradient_end" value="#49a09d">
+                </div>
+                <div class="col-12">
+                  <button type="submit" class="btn btn-primary">Tema Ayarlarını Kaydet</button>
+                  <div class="mt-3" id="theme-form-message"></div>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-7">
+          <div class="card bg-secondary border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2 class="h4 mb-0">Ana Sayfa Bileşenleri</h2>
+                <span class="badge bg-info text-dark">Widget Sistemi</span>
+              </div>
+              <p class="text-muted small">Bileşenleri etkinleştirerek veya sırasını değiştirerek ana sayfayı şekillendirin.</p>
+              <div id="widget-list" class="vstack gap-3"></div>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

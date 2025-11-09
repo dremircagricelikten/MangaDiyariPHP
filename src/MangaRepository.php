@@ -104,12 +104,41 @@ class MangaRepository
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    public function getFeatured(int $limit = 5): array
+    public function getPopular(array $options = []): array
     {
-        $stmt = $this->db->prepare('SELECT * FROM mangas ORDER BY RANDOM() LIMIT :limit');
+        $limit = isset($options['limit']) ? max(1, (int) $options['limit']) : 5;
+        $status = $options['status'] ?? null;
+        $sort = $options['sort'] ?? 'random';
+
+        $orderBy = match ($sort) {
+            'newest' => 'created_at DESC',
+            'alphabetical' => 'title COLLATE NOCASE ASC',
+            'updated' => 'updated_at DESC',
+            default => 'RANDOM()',
+        };
+
+        $query = 'SELECT * FROM mangas';
+        $params = [];
+
+        if ($status) {
+            $query .= ' WHERE status = :status';
+            $params[':status'] = $status;
+        }
+
+        $query .= ' ORDER BY ' . $orderBy . ' LIMIT :limit';
+
+        $stmt = $this->db->prepare($query);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function getFeatured(int $limit = 5): array
+    {
+        return $this->getPopular(['limit' => $limit]);
     }
 }

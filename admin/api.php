@@ -9,11 +9,15 @@ require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/MangaRepository.php';
 require_once __DIR__ . '/../src/ChapterRepository.php';
 require_once __DIR__ . '/../src/Slugger.php';
+require_once __DIR__ . '/../src/SettingRepository.php';
+require_once __DIR__ . '/../src/WidgetRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
 use MangaDiyari\Core\MangaRepository;
 use MangaDiyari\Core\ChapterRepository;
+use MangaDiyari\Core\SettingRepository;
+use MangaDiyari\Core\WidgetRepository;
 
 Auth::start();
 if (!Auth::checkRole(['admin', 'editor'])) {
@@ -26,6 +30,8 @@ try {
     $pdo = Database::getConnection();
     $mangaRepo = new MangaRepository($pdo);
     $chapterRepo = new ChapterRepository($pdo);
+    $settingRepo = new SettingRepository($pdo);
+    $widgetRepo = new WidgetRepository($pdo);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
@@ -71,6 +77,56 @@ try {
             ]);
 
             echo json_encode(['message' => 'Bölüm başarıyla oluşturuldu', 'chapter' => $chapter]);
+            break;
+        case 'get-settings':
+            $settings = $settingRepo->all();
+            echo json_encode(['data' => $settings]);
+            break;
+        case 'update-settings':
+            $allowed = ['primary_color', 'accent_color', 'background_color', 'gradient_start', 'gradient_end'];
+            $updates = [];
+            foreach ($allowed as $key) {
+                if (isset($_POST[$key])) {
+                    $value = trim((string) $_POST[$key]);
+                    $settingRepo->set($key, $value);
+                    $updates[$key] = $value;
+                }
+            }
+
+            echo json_encode(['message' => 'Tema ayarları güncellendi', 'data' => $updates]);
+            break;
+        case 'list-widgets':
+            $widgets = $widgetRepo->all();
+            echo json_encode(['data' => $widgets]);
+            break;
+        case 'update-widget':
+            $widgetId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($widgetId <= 0) {
+                throw new InvalidArgumentException('Geçersiz widget');
+            }
+
+            $configPayload = $_POST['config'] ?? '{}';
+            if (is_array($configPayload)) {
+                $config = $configPayload;
+            } else {
+                $config = json_decode((string) $configPayload, true);
+                if (!is_array($config)) {
+                    throw new InvalidArgumentException('Widget yapılandırması çözümlenemedi');
+                }
+            }
+
+            $updated = $widgetRepo->update($widgetId, [
+                'title' => trim((string) ($_POST['title'] ?? '')),
+                'enabled' => isset($_POST['enabled']) ? (int) $_POST['enabled'] : 0,
+                'sort_order' => isset($_POST['sort_order']) ? (int) $_POST['sort_order'] : 0,
+                'config' => $config,
+            ]);
+
+            if (!$updated) {
+                throw new InvalidArgumentException('Widget güncellenemedi');
+            }
+
+            echo json_encode(['message' => 'Widget güncellendi', 'widget' => $updated]);
             break;
         default:
             http_response_code(400);

@@ -1,13 +1,14 @@
 body {
   min-height: 100vh;
+  background-color: var(--color-background);
 }
 
 .bg-gradient {
-  background: linear-gradient(90deg, #5f2c82 0%, #49a09d 100%);
+  background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
 }
 
 .hero {
-  background: radial-gradient(circle at top left, rgba(95, 44, 130, 0.5), rgba(0, 0, 0, 0.9));
+  background: radial-gradient(circle at top left, color-mix(in srgb, var(--gradient-start) 55%, transparent), rgba(0, 0, 0, 0.85));
 }
 
 .hero-card {
@@ -25,6 +26,26 @@ body {
 .section-title {
   font-weight: 700;
   letter-spacing: 0.05em;
+}
+
+.widget-controls .form-label {
+  color: rgba(255, 255, 255, 0.6);
+  letter-spacing: 0.05em;
+}
+
+.widget-controls .form-select,
+.widget-controls .form-select-sm,
+.widget-controls .form-control {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #f8f9fa;
+}
+
+.widget-controls .form-select:focus,
+.widget-controls .form-select-sm:focus,
+.widget-controls .form-control:focus {
+  box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-color: var(--color-accent);
 }
 
 .cover-wrapper {
