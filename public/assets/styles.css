@@ -1,0 +1,43 @@
+body {
+  min-height: 100vh;
+}
+
+.bg-gradient {
+  background: linear-gradient(90deg, #5f2c82 0%, #49a09d 100%);
+}
+
+.hero {
+  background: radial-gradient(circle at top left, rgba(95, 44, 130, 0.5), rgba(0, 0, 0, 0.9));
+}
+
+.hero-card {
+  border-radius: 1.5rem;
+  overflow: hidden;
+}
+
+.text-truncate-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.section-title {
+  font-weight: 700;
+  letter-spacing: 0.05em;
+}
+
+.cover-wrapper {
+  background: rgba(255, 255, 255, 0.08);
+  padding: 1.5rem;
+  border-radius: 1rem;
+}
+
+.chapter-content p {
+  font-size: 1.1rem;
+  line-height: 1.8;
+}
+
+.chapter-content img {
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+}
