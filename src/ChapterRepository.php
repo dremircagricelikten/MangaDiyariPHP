@@ -101,4 +101,43 @@ class ChapterRepository
         $chapter = $stmt->fetch(PDO::FETCH_ASSOC);
         return $chapter ?: null;
     }
+
+    public function getLatestChapters(int $limit = 8, array $options = []): array
+    {
+        $limit = max(1, $limit);
+        $status = $options['status'] ?? null;
+        $sort = $options['sort'] ?? 'newest';
+
+        $orderBy = match ($sort) {
+            'oldest' => 'chapters.created_at ASC',
+            'chapter_desc' => 'CAST(chapters.number AS REAL) DESC',
+            'chapter_asc' => 'CAST(chapters.number AS REAL) ASC',
+            default => 'chapters.created_at DESC',
+        };
+
+        $query = 'SELECT chapters.*, mangas.title AS manga_title, mangas.slug AS manga_slug, mangas.cover_image '
+            . 'FROM chapters INNER JOIN mangas ON mangas.id = chapters.manga_id';
+        $conditions = [];
+        $params = [];
+
+        if ($status) {
+            $conditions[] = 'mangas.status = :status';
+            $params[':status'] = $status;
+        }
+
+        if ($conditions) {
+            $query .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        $query .= ' ORDER BY ' . $orderBy . ' LIMIT :limit';
+
+        $stmt = $this->db->prepare($query);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
 }
