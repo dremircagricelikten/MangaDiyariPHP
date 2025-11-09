@@ -36,6 +36,14 @@ Bootstrap, jQuery ve AJAX kullanarak hazırlanan hafif bir manga okuma CMS'si. W
    php -S localhost:8001 -t admin
    ```
 
+### Plesk üzerinde çalıştırma
+
+1. Depoyu Plesk hesabınızdaki alan adınızın `httpdocs` dizinine çıkarın.
+2. Varsayılan olarak gelen `.htaccess` dosyası, tüm istekleri otomatik olarak `public/` dizinine yönlendirir. Ek bir yapılandırmaya gerek yoktur.
+3. Uygulama ilk ziyaret edildiğinde SQLite veritabanı, tablo yapıları ve varsayılan yönetici hesabı (config.php dosyasındaki bilgilerle) otomatik olarak oluşturulur.
+4. `config.php` içerisindeki veritabanı dosya yolu ve yönetici bilgileri Plesk ortamına göre günceldir; yalnızca yönetici parolasını değiştirdiğinizden emin olun.
+5. Yönetim paneline `https://alanadiniz.tld/admin/` adresinden erişebilirsiniz.
+
 ## Dizim
 
 ```
