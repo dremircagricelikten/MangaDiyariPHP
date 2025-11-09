@@ -19,6 +19,10 @@ class UserRepository
         $email = strtolower(trim($data['email'] ?? ''));
         $password = $data['password'] ?? '';
         $role = $data['role'] ?? 'member';
+        $bio = trim($data['bio'] ?? '');
+        $avatar = trim($data['avatar_url'] ?? '');
+        $website = trim($data['website_url'] ?? '');
+        $isActive = array_key_exists('is_active', $data) ? (int) $data['is_active'] : 1;
 
         if ($username === '' || $email === '' || $password === '') {
             throw new InvalidArgumentException('Kullanıcı adı, e-posta ve parola zorunludur.');
@@ -38,7 +42,7 @@ class UserRepository
 
         $now = new DateTimeImmutable();
 
-        $stmt = $this->pdo->prepare('INSERT INTO users (username, email, password_hash, role, created_at, updated_at) VALUES (:username, :email, :password, :role, :created, :updated)');
+        $stmt = $this->pdo->prepare('INSERT INTO users (username, email, password_hash, role, bio, avatar_url, website_url, is_active, created_at, updated_at) VALUES (:username, :email, :password, :role, :bio, :avatar, :website, :is_active, :created, :updated)');
 
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
@@ -48,6 +52,10 @@ class UserRepository
                 ':email' => $email,
                 ':password' => $passwordHash,
                 ':role' => $role,
+                ':bio' => $bio,
+                ':avatar' => $avatar,
+                ':website' => $website,
+                ':is_active' => $isActive ? 1 : 0,
                 ':created' => $now->format(DateTimeImmutable::ATOM),
                 ':updated' => $now->format(DateTimeImmutable::ATOM),
             ]);
@@ -55,12 +63,19 @@ class UserRepository
             throw new InvalidArgumentException('Kullanıcı oluşturulamadı: ' . $exception->getMessage(), previous: $exception);
         }
 
-        return $this->findById((int) $this->pdo->lastInsertId());
+        $user = $this->findById((int) $this->pdo->lastInsertId());
+        if (!$user) {
+            throw new InvalidArgumentException('Kullanıcı oluşturulamadı.');
+        }
+
+        unset($user['password_hash']);
+
+        return $user;
     }
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, username, email, role, password_hash FROM users WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, created_at, updated_at FROM users WHERE id = :id LIMIT 1');
         $stmt->execute([':id' => $id]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -69,7 +84,7 @@ class UserRepository
 
     public function findByEmail(string $email): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, username, email, role, password_hash FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, created_at, updated_at FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
         $stmt->execute([':email' => $email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -78,7 +93,7 @@ class UserRepository
 
     public function findByUsername(string $username): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, username, email, role, password_hash FROM users WHERE username = :username LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, created_at, updated_at FROM users WHERE username = :username LIMIT 1');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -91,7 +106,7 @@ class UserRepository
             ? $this->findByEmail($login)
             : $this->findByUsername($login);
 
-        if (!$user) {
+        if (!$user || (int) ($user['is_active'] ?? 1) !== 1) {
             return null;
         }
 
@@ -100,5 +115,166 @@ class UserRepository
         }
 
         return $user;
+    }
+
+    public function all(): array
+    {
+        $stmt = $this->pdo->query('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, created_at, updated_at FROM users ORDER BY created_at DESC');
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    public function updateProfile(int $id, array $data): array
+    {
+        $user = $this->findById($id);
+        if (!$user) {
+            throw new InvalidArgumentException('Kullanıcı bulunamadı.');
+        }
+
+        $email = strtolower(trim($data['email'] ?? $user['email'] ?? ''));
+        $bio = trim($data['bio'] ?? ($user['bio'] ?? ''));
+        $avatar = trim($data['avatar_url'] ?? ($user['avatar_url'] ?? ''));
+        $website = trim($data['website_url'] ?? ($user['website_url'] ?? ''));
+
+        if ($email === '') {
+            throw new InvalidArgumentException('E-posta adresi boş olamaz.');
+        }
+
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException('Geçerli bir e-posta adresi giriniz.');
+        }
+
+        $existing = $this->findByEmail($email);
+        if ($existing && (int) $existing['id'] !== $id) {
+            throw new InvalidArgumentException('Bu e-posta adresi başka bir üyeye ait.');
+        }
+
+        $now = new DateTimeImmutable();
+        $stmt = $this->pdo->prepare('UPDATE users SET email = :email, bio = :bio, avatar_url = :avatar, website_url = :website, updated_at = :updated WHERE id = :id');
+        $stmt->execute([
+            ':email' => $email,
+            ':bio' => $bio,
+            ':avatar' => $avatar,
+            ':website' => $website,
+            ':updated' => $now->format(DateTimeImmutable::ATOM),
+            ':id' => $id,
+        ]);
+
+        $updated = $this->findById($id);
+        if (!$updated) {
+            throw new InvalidArgumentException('Profil güncellenemedi.');
+        }
+
+        unset($updated['password_hash']);
+
+        return $updated;
+    }
+
+    public function updateRole(int $id, string $role): array
+    {
+        $allowed = ['admin', 'editor', 'member'];
+        if (!in_array($role, $allowed, true)) {
+            throw new InvalidArgumentException('Geçersiz rol seçimi.');
+        }
+
+        $user = $this->findById($id);
+        if (!$user) {
+            throw new InvalidArgumentException('Kullanıcı bulunamadı.');
+        }
+
+        $now = new DateTimeImmutable();
+        $stmt = $this->pdo->prepare('UPDATE users SET role = :role, updated_at = :updated WHERE id = :id');
+        $stmt->execute([
+            ':role' => $role,
+            ':updated' => $now->format(DateTimeImmutable::ATOM),
+            ':id' => $id,
+        ]);
+
+        $updated = $this->findById($id);
+        if (!$updated) {
+            throw new InvalidArgumentException('Kullanıcı güncellenemedi.');
+        }
+
+        unset($updated['password_hash']);
+
+        return $updated;
+    }
+
+    public function setActive(int $id, bool $isActive): array
+    {
+        $user = $this->findById($id);
+        if (!$user) {
+            throw new InvalidArgumentException('Kullanıcı bulunamadı.');
+        }
+
+        $now = new DateTimeImmutable();
+        $stmt = $this->pdo->prepare('UPDATE users SET is_active = :active, updated_at = :updated WHERE id = :id');
+        $stmt->execute([
+            ':active' => $isActive ? 1 : 0,
+            ':updated' => $now->format(DateTimeImmutable::ATOM),
+            ':id' => $id,
+        ]);
+
+        $updated = $this->findById($id);
+        if (!$updated) {
+            throw new InvalidArgumentException('Kullanıcı güncellenemedi.');
+        }
+
+        unset($updated['password_hash']);
+
+        return $updated;
+    }
+
+    public function updateCredentials(int $id, ?string $role, ?bool $isActive, ?string $password): array
+    {
+        $user = $this->findById($id);
+        if (!$user) {
+            throw new InvalidArgumentException('Kullanıcı bulunamadı.');
+        }
+
+        $fields = [];
+        $params = [':id' => $id];
+
+        if ($role !== null) {
+            $allowed = ['admin', 'editor', 'member'];
+            if (!in_array($role, $allowed, true)) {
+                throw new InvalidArgumentException('Geçersiz rol seçimi.');
+            }
+            $fields[] = 'role = :role';
+            $params[':role'] = $role;
+        }
+
+        if ($isActive !== null) {
+            $fields[] = 'is_active = :active';
+            $params[':active'] = $isActive ? 1 : 0;
+        }
+
+        if ($password !== null && $password !== '') {
+            if (strlen($password) < 6) {
+                throw new InvalidArgumentException('Parola en az 6 karakter olmalıdır.');
+            }
+            $fields[] = 'password_hash = :password';
+            $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
+        }
+
+        if (!$fields) {
+            return $this->findById($id) ?: $user;
+        }
+
+        $fields[] = 'updated_at = :updated';
+        $params[':updated'] = (new DateTimeImmutable())->format(DateTimeImmutable::ATOM);
+
+        $sql = 'UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id';
+        $stmt = $this->pdo->prepare($sql);
+        $stmt->execute($params);
+
+        $updated = $this->findById($id);
+        if (!$updated) {
+            throw new InvalidArgumentException('Kullanıcı güncellenemedi.');
+        }
+
+        unset($updated['password_hash']);
+
+        return $updated;
     }
 }

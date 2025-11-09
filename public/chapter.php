@@ -34,7 +34,9 @@ $site = $config['site'];
               <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
             <?php endif; ?>
             <?php if ($user): ?>
-              <li class="nav-item"><span class="nav-link disabled">Merhaba, <?= htmlspecialchars($user['username']) ?></span></li>
+              <?php $memberProfileUrl = 'member.php?u=' . urlencode($user['username']); ?>
+              <li class="nav-item"><a class="nav-link" href="profile.php">Profilim</a></li>
+              <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($memberProfileUrl) ?>">Kamu Profili</a></li>
               <li class="nav-item"><a class="nav-link" href="logout.php">Çıkış Yap</a></li>
             <?php else: ?>
               <li class="nav-item"><a class="nav-link" href="login.php">Giriş Yap</a></li>

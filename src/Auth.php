@@ -25,6 +25,7 @@ class Auth
             'username' => $user['username'],
             'email' => $user['email'],
             'role' => $user['role'],
+            'avatar_url' => $user['avatar_url'] ?? null,
         ];
     }
 

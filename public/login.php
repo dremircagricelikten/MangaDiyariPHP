@@ -30,7 +30,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $user = $users->verifyCredentials($login, $password);
 
         if (!$user) {
-            $error = 'Giriş bilgileri hatalı.';
+            $existing = filter_var($login, FILTER_VALIDATE_EMAIL)
+                ? $users->findByEmail($login)
+                : $users->findByUsername($login);
+
+            if ($existing && isset($existing['is_active']) && (int) $existing['is_active'] === 0) {
+                $error = 'Hesabınız pasif durumdadır. Lütfen yöneticiyle iletişime geçin.';
+            } else {
+                $error = 'Giriş bilgileri hatalı.';
+            }
         } else {
             unset($user['password_hash']);
             Auth::login($user);

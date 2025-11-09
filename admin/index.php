@@ -164,6 +164,113 @@ $user = Auth::user();
           </div>
         </div>
       </div>
+
+      <div class="row g-4 mt-1">
+        <div class="col-lg-7">
+          <div class="card bg-secondary border-0 shadow-sm h-100">
+            <div class="card-body">
+              <div class="d-flex justify-content-between align-items-center mb-3">
+                <div>
+                  <h2 class="h4 mb-1">Üye Yönetimi</h2>
+                  <p class="text-muted small mb-0">Üyeleri görüntüleyin, rollerini güncelleyin ve hesap durumlarını yönetin.</p>
+                </div>
+                <span class="badge bg-info text-dark">Topluluk</span>
+              </div>
+
+              <div class="bg-dark bg-opacity-25 border rounded-4 p-3 mb-4">
+                <h3 class="h5 mb-3">Yeni Üye Oluştur</h3>
+                <form id="create-user-form" class="row g-3">
+                  <div class="col-md-4">
+                    <label class="form-label">Kullanıcı Adı</label>
+                    <input type="text" class="form-control" name="username" required>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">E-posta</label>
+                    <input type="email" class="form-control" name="email" required>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Parola</label>
+                    <input type="password" class="form-control" name="password" minlength="6" required>
+                  </div>
+                  <div class="col-md-4">
+                    <label class="form-label">Rol</label>
+                    <select class="form-select" name="role">
+                      <option value="member">Üye</option>
+                      <option value="editor">Editör</option>
+                      <option value="admin">Yönetici</option>
+                    </select>
+                  </div>
+                  <div class="col-md-4 d-flex align-items-end">
+                    <div class="form-check form-switch">
+                      <input class="form-check-input" type="checkbox" name="is_active" id="user-active" checked value="1">
+                      <label class="form-check-label" for="user-active">Hesap Aktif</label>
+                    </div>
+                  </div>
+                  <div class="col-12">
+                    <button type="submit" class="btn btn-outline-light btn-sm">Üyeyi Oluştur</button>
+                  </div>
+                </form>
+                <div class="mt-3" id="create-user-message"></div>
+              </div>
+
+              <div class="table-responsive">
+                <table class="table table-dark table-striped align-middle" id="user-table">
+                  <thead>
+                    <tr>
+                      <th>Üye</th>
+                      <th>Rol</th>
+                      <th class="text-center">Durum</th>
+                      <th>Parola &amp; İşlemler</th>
+                    </tr>
+                  </thead>
+                  <tbody></tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="col-lg-5">
+          <div class="card bg-secondary border-0 shadow-sm h-100">
+            <div class="card-body">
+              <h2 class="h4 mb-3">FTP Ayarları</h2>
+              <p class="text-muted small">Bölümleri uzak bir sunucuya aktarabilmek için FTP bağlantı bilgilerini girin.</p>
+              <form id="ftp-form" class="vstack gap-3">
+                <div class="row g-3">
+                  <div class="col-md-6">
+                    <label class="form-label">Sunucu</label>
+                    <input type="text" class="form-control" name="ftp_host" placeholder="ftp.example.com">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Port</label>
+                    <input type="number" class="form-control" name="ftp_port" value="21" min="1" max="65535">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Kullanıcı Adı</label>
+                    <input type="text" class="form-control" name="ftp_username">
+                  </div>
+                  <div class="col-md-6">
+                    <label class="form-label">Parola</label>
+                    <input type="password" class="form-control" name="ftp_password">
+                  </div>
+                  <div class="col-12">
+                    <label class="form-label">Kök Klasör</label>
+                    <input type="text" class="form-control" name="ftp_root" placeholder="/public_html/manga" value="/">
+                  </div>
+                </div>
+                <div class="form-check form-switch">
+                  <input class="form-check-input" type="checkbox" role="switch" name="ftp_passive" id="ftp-passive" value="1" checked>
+                  <label class="form-check-label" for="ftp-passive">Pasif Mod</label>
+                </div>
+                <div class="d-flex align-items-center gap-3">
+                  <button type="submit" class="btn btn-outline-light btn-sm">FTP Ayarlarını Kaydet</button>
+                  <span class="small" id="ftp-form-message"></span>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </div>
     </main>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

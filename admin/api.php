@@ -11,6 +11,7 @@ require_once __DIR__ . '/../src/ChapterRepository.php';
 require_once __DIR__ . '/../src/Slugger.php';
 require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/WidgetRepository.php';
+require_once __DIR__ . '/../src/UserRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
@@ -18,6 +19,7 @@ use MangaDiyari\Core\MangaRepository;
 use MangaDiyari\Core\ChapterRepository;
 use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\WidgetRepository;
+use MangaDiyari\Core\UserRepository;
 
 Auth::start();
 if (!Auth::checkRole(['admin', 'editor'])) {
@@ -32,6 +34,7 @@ try {
     $chapterRepo = new ChapterRepository($pdo);
     $settingRepo = new SettingRepository($pdo);
     $widgetRepo = new WidgetRepository($pdo);
+    $userRepo = new UserRepository($pdo);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
@@ -127,6 +130,64 @@ try {
             }
 
             echo json_encode(['message' => 'Widget güncellendi', 'widget' => $updated]);
+            break;
+        case 'list-users':
+            $users = array_map(static function (array $user): array {
+                unset($user['password_hash']);
+                return $user;
+            }, $userRepo->all());
+            echo json_encode(['data' => $users]);
+            break;
+        case 'create-user':
+            $user = $userRepo->create([
+                'username' => trim((string) ($_POST['username'] ?? '')),
+                'email' => trim((string) ($_POST['email'] ?? '')),
+                'password' => (string) ($_POST['password'] ?? ''),
+                'role' => (string) ($_POST['role'] ?? 'member'),
+                'is_active' => isset($_POST['is_active']) ? (int) $_POST['is_active'] : 1,
+            ]);
+            echo json_encode(['message' => 'Yeni üye oluşturuldu', 'user' => $user]);
+            break;
+        case 'update-user':
+            $userId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($userId <= 0) {
+                throw new InvalidArgumentException('Geçersiz üye');
+            }
+
+            $role = isset($_POST['role']) ? (string) $_POST['role'] : null;
+            $isActive = isset($_POST['is_active']) ? (bool) (int) $_POST['is_active'] : null;
+            $password = isset($_POST['password']) ? (string) $_POST['password'] : null;
+
+            $updated = $userRepo->updateCredentials($userId, $role, $isActive, $password);
+            echo json_encode(['message' => 'Üye bilgileri güncellendi', 'user' => $updated]);
+            break;
+        case 'get-ftp-settings':
+            $ftpDefaults = [
+                'ftp_host' => '',
+                'ftp_port' => '21',
+                'ftp_username' => '',
+                'ftp_password' => '',
+                'ftp_root' => '/',
+                'ftp_passive' => '1',
+            ];
+            $settings = $settingRepo->all();
+            $ftpSettings = [];
+            foreach ($ftpDefaults as $key => $default) {
+                $ftpSettings[$key] = $settings[$key] ?? $default;
+            }
+            echo json_encode(['data' => $ftpSettings]);
+            break;
+        case 'update-ftp-settings':
+            $keys = ['ftp_host', 'ftp_port', 'ftp_username', 'ftp_password', 'ftp_root', 'ftp_passive'];
+            $updates = [];
+            foreach ($keys as $key) {
+                if (isset($_POST[$key])) {
+                    $value = $key === 'ftp_password' ? (string) $_POST[$key] : trim((string) $_POST[$key]);
+                    $settingRepo->set($key, $value);
+                    $updates[$key] = $value;
+                }
+            }
+            echo json_encode(['message' => 'FTP ayarları güncellendi', 'data' => $updates]);
             break;
         default:
             http_response_code(400);

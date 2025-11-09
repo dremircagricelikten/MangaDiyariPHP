@@ -13,3 +13,31 @@ body {
 textarea {
   resize: vertical;
 }
+
+.avatar-placeholder {
+  width: 36px;
+  height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-weight: 600;
+  text-transform: uppercase;
+  border-radius: 50%;
+}
+
+#user-table td {
+  vertical-align: middle;
+}
+
+#user-table .form-select,
+#user-table .form-control {
+  background-color: rgba(0, 0, 0, 0.25);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+#user-table .form-control::placeholder {
+  color: rgba(255, 255, 255, 0.6);
+}
