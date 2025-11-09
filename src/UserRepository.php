@@ -56,8 +56,8 @@ class UserRepository
                 ':avatar' => $avatar,
                 ':website' => $website,
                 ':is_active' => $isActive ? 1 : 0,
-                ':created' => $now->format(DateTimeImmutable::ATOM),
-                ':updated' => $now->format(DateTimeImmutable::ATOM),
+                ':created' => $now->format('Y-m-d H:i:s'),
+                ':updated' => $now->format('Y-m-d H:i:s'),
             ]);
         } catch (PDOException $exception) {
             throw new InvalidArgumentException('Kullanıcı oluşturulamadı: ' . $exception->getMessage(), previous: $exception);
@@ -156,7 +156,7 @@ class UserRepository
             ':bio' => $bio,
             ':avatar' => $avatar,
             ':website' => $website,
-            ':updated' => $now->format(DateTimeImmutable::ATOM),
+            ':updated' => $now->format('Y-m-d H:i:s'),
             ':id' => $id,
         ]);
 
@@ -186,7 +186,7 @@ class UserRepository
         $stmt = $this->pdo->prepare('UPDATE users SET role = :role, updated_at = :updated WHERE id = :id');
         $stmt->execute([
             ':role' => $role,
-            ':updated' => $now->format(DateTimeImmutable::ATOM),
+            ':updated' => $now->format('Y-m-d H:i:s'),
             ':id' => $id,
         ]);
 
@@ -200,7 +200,7 @@ class UserRepository
         return $updated;
     }
 
-    public function setActive(int $id, bool $isActive): array
+    public function updateCredentials(int $id, ?string $role = null, ?bool $isActive = null, ?string $password = null): array
     {
         $user = $this->findById($id);
         if (!$user) {
@@ -208,36 +208,14 @@ class UserRepository
         }
 
         $now = new DateTimeImmutable();
-        $stmt = $this->pdo->prepare('UPDATE users SET is_active = :active, updated_at = :updated WHERE id = :id');
-        $stmt->execute([
-            ':active' => $isActive ? 1 : 0,
-            ':updated' => $now->format(DateTimeImmutable::ATOM),
+        $fields = ['updated_at = :updated'];
+        $params = [
+            ':updated' => $now->format('Y-m-d H:i:s'),
             ':id' => $id,
-        ]);
-
-        $updated = $this->findById($id);
-        if (!$updated) {
-            throw new InvalidArgumentException('Kullanıcı güncellenemedi.');
-        }
-
-        unset($updated['password_hash']);
-
-        return $updated;
-    }
-
-    public function updateCredentials(int $id, ?string $role, ?bool $isActive, ?string $password): array
-    {
-        $user = $this->findById($id);
-        if (!$user) {
-            throw new InvalidArgumentException('Kullanıcı bulunamadı.');
-        }
-
-        $fields = [];
-        $params = [':id' => $id];
+        ];
 
         if ($role !== null) {
-            $allowed = ['admin', 'editor', 'member'];
-            if (!in_array($role, $allowed, true)) {
+            if (!in_array($role, ['admin', 'editor', 'member'], true)) {
                 throw new InvalidArgumentException('Geçersiz rol seçimi.');
             }
             $fields[] = 'role = :role';
@@ -245,24 +223,14 @@ class UserRepository
         }
 
         if ($isActive !== null) {
-            $fields[] = 'is_active = :active';
-            $params[':active'] = $isActive ? 1 : 0;
+            $fields[] = 'is_active = :is_active';
+            $params[':is_active'] = $isActive ? 1 : 0;
         }
 
         if ($password !== null && $password !== '') {
-            if (strlen($password) < 6) {
-                throw new InvalidArgumentException('Parola en az 6 karakter olmalıdır.');
-            }
             $fields[] = 'password_hash = :password';
             $params[':password'] = password_hash($password, PASSWORD_DEFAULT);
         }
-
-        if (!$fields) {
-            return $this->findById($id) ?: $user;
-        }
-
-        $fields[] = 'updated_at = :updated';
-        $params[':updated'] = (new DateTimeImmutable())->format(DateTimeImmutable::ATOM);
 
         $sql = 'UPDATE users SET ' . implode(', ', $fields) . ' WHERE id = :id';
         $stmt = $this->pdo->prepare($sql);

@@ -42,10 +42,18 @@ $(function () {
     event.preventDefault();
     const form = $(this);
     const message = $('#chapter-form-message');
-    $.post('api.php?action=create-chapter', form.serialize())
+    message.empty();
+    const formData = new FormData(this);
+    $.ajax({
+      url: 'api.php?action=create-chapter',
+      type: 'POST',
+      data: formData,
+      processData: false,
+      contentType: false,
+    })
       .done((response) => {
         message.html(`<div class="alert alert-success">${response.message}</div>`);
-        form.trigger('reset');
+        form[0].reset();
       })
       .fail((xhr) => handleError(xhr, message));
   });
@@ -383,6 +391,294 @@ $(function () {
       });
   });
 
+  function loadBranding() {
+    const form = $('#branding-form');
+    $.getJSON('api.php', { action: 'get-branding' })
+      .done(({ data }) => {
+        if (!data) return;
+        form.find('[name="site_name"]').val(data.site_name || '');
+        form.find('[name="site_tagline"]').val(data.site_tagline || '');
+        if (data.site_logo) {
+          $('#branding-preview').html(`<img src="../public/${data.site_logo}" alt="Logo" class="img-fluid rounded shadow-sm" style="max-height: 80px;">`);
+        }
+      });
+  }
+
+  $('#branding-form').on('submit', function (event) {
+    event.preventDefault();
+    const form = $(this);
+    const message = $('#branding-form-message');
+    const formData = new FormData(this);
+    $.ajax({
+      url: 'api.php?action=update-branding',
+      type: 'POST',
+      data: formData,
+      processData: false,
+      contentType: false,
+    })
+      .done((response) => {
+        message.html(`<div class="alert alert-success">${response.message}</div>`);
+        if (response.data?.site_logo) {
+          $('#branding-preview').html(`<img src="../public/${response.data.site_logo}" alt="Logo" class="img-fluid rounded shadow-sm" style="max-height: 80px;">`);
+        }
+      })
+      .fail((xhr) => handleError(xhr, message));
+  });
+
+  function loadAdSettings() {
+    const form = $('#ad-form');
+    $.getJSON('api.php', { action: 'get-ad-settings' })
+      .done(({ data }) => {
+        if (!data) return;
+        form.find('[name="ad_header"]').val(data.ad_header || '');
+        form.find('[name="ad_sidebar"]').val(data.ad_sidebar || '');
+        form.find('[name="ad_footer"]').val(data.ad_footer || '');
+      });
+  }
+
+  $('#ad-form').on('submit', function (event) {
+    event.preventDefault();
+    const form = $(this);
+    const message = $('#ad-form-message');
+    $.post('api.php?action=update-ad-settings', form.serialize())
+      .done((response) => {
+        message.html(`<div class="alert alert-success">${response.message}</div>`);
+      })
+      .fail((xhr) => handleError(xhr, message));
+  });
+
+  function loadAnalyticsSettings() {
+    const form = $('#analytics-form');
+    $.getJSON('api.php', { action: 'get-analytics' })
+      .done(({ data }) => {
+        if (!data) return;
+        form.find('[name="analytics_google"]').val(data.analytics_google || '');
+        form.find('[name="analytics_search_console"]').val(data.analytics_search_console || '');
+      });
+  }
+
+  $('#analytics-form').on('submit', function (event) {
+    event.preventDefault();
+    const form = $(this);
+    const message = $('#analytics-form-message');
+    $.post('api.php?action=update-analytics', form.serialize())
+      .done((response) => {
+        message.html(`<div class="alert alert-success">${response.message}</div>`);
+      })
+      .fail((xhr) => handleError(xhr, message));
+  });
+
+  let menus = [];
+  let activeMenuId = null;
+
+  function renderMenuList() {
+    const list = $('#menu-list');
+    list.empty();
+    if (!menus.length) {
+      list.append('<div class="text-secondary small">Henüz menü oluşturulmadı.</div>');
+      $('#menu-editor').html('<div class="text-secondary small">Bir menü seçin veya yeni bir menü oluşturun.</div>');
+      return;
+    }
+
+    menus.forEach((menu) => {
+      const activeClass = menu.id === activeMenuId ? 'active' : '';
+      list.append(`<button type="button" class="list-group-item list-group-item-action ${activeClass}" data-menu-id="${menu.id}">${menu.name}<div class="small text-muted">${menu.location}</div></button>`);
+    });
+  }
+
+  function renderMenuEditor(menu) {
+    if (!menu) {
+      $('#menu-editor').html('<div class="text-secondary small">Bir menü seçin veya yeni bir menü oluşturun.</div>');
+      return;
+    }
+
+    const items = menu.items || [];
+    const itemRows = items
+      .map((item) => renderMenuItemRow(item))
+      .join('');
+
+    $('#menu-editor').html(`
+      <form id="menu-details" data-menu-id="${menu.id}">
+        <div class="row g-3 mb-3">
+          <div class="col-md-6">
+            <label class="form-label">Menü Adı</label>
+            <input type="text" class="form-control" name="name" value="${menu.name}">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Konum</label>
+            <input type="text" class="form-control" name="location" value="${menu.location}" placeholder="primary, footer">
+            <div class="form-text">Konumlar şablonda kullanılır, benzersiz olmalıdır.</div>
+          </div>
+        </div>
+        <div class="vstack" id="menu-items">
+          ${itemRows || '<div class="text-secondary small">Henüz menü öğesi eklenmemiş.</div>'}
+        </div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button class="btn btn-outline-light btn-sm" type="button" id="add-menu-item">Öğe Ekle</button>
+          <div class="ms-auto d-flex gap-2">
+            <button class="btn btn-outline-danger btn-sm" type="button" id="delete-menu">Menüyü Sil</button>
+            <button class="btn btn-outline-light btn-sm" type="button" id="save-menu-items">Menü Öğelerini Kaydet</button>
+          </div>
+        </div>
+        <div class="mt-3 d-flex gap-2 align-items-center">
+          <button class="btn btn-primary btn-sm" type="submit">Menü Bilgilerini Kaydet</button>
+          <div class="small text-info" id="menu-message"></div>
+        </div>
+      </form>
+    `);
+  }
+
+  function renderMenuItemRow(item = {}) {
+    const label = item.label || '';
+    const url = item.url || '';
+    const target = item.target || '_self';
+    const sortOrder = item.sort_order ?? '';
+    return `
+      <div class="menu-item-row" data-menu-item>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Başlık</label>
+            <input type="text" class="form-control" name="label" value="${label}" placeholder="Menü Başlığı">
+          </div>
+          <div class="col-md-5">
+            <label class="form-label">Bağlantı</label>
+            <input type="text" class="form-control" name="url" value="${url}" placeholder="https:// veya /sayfa">
+          </div>
+          <div class="col-md-2">
+            <label class="form-label">Hedef</label>
+            <select class="form-select" name="target">
+              <option value="_self" ${target === '_self' ? 'selected' : ''}>Aynı Sekme</option>
+              <option value="_blank" ${target === '_blank' ? 'selected' : ''}>Yeni Sekme</option>
+            </select>
+          </div>
+          <div class="col-md-1">
+            <label class="form-label">Sıra</label>
+            <input type="number" class="form-control" name="sort_order" value="${sortOrder}">
+          </div>
+        </div>
+        <div class="d-flex justify-content-end mt-2">
+          <button type="button" class="btn btn-link text-danger text-decoration-none p-0 remove-menu-item">Öğeyi Sil</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function loadMenus(selectedId = null) {
+    $.getJSON('api.php', { action: 'list-menus' })
+      .done(({ data }) => {
+        menus = data || [];
+        if (selectedId) {
+          activeMenuId = selectedId;
+        } else if (!menus.find((menu) => menu.id === activeMenuId)) {
+          activeMenuId = menus[0]?.id ?? null;
+        }
+        renderMenuList();
+        renderMenuEditor(menus.find((menu) => menu.id === activeMenuId));
+      });
+  }
+
+  $('#menu-list').on('click', '.list-group-item', function () {
+    activeMenuId = Number($(this).data('menu-id'));
+    renderMenuList();
+    renderMenuEditor(menus.find((menu) => menu.id === activeMenuId));
+  });
+
+  $('#create-menu-btn').on('click', function () {
+    const name = window.prompt('Menü adı:');
+    if (!name) return;
+    const location = window.prompt('Menü konumu (örn. primary, footer):');
+    if (!location) return;
+
+    $.post('api.php?action=create-menu', { name, location })
+      .done((response) => {
+        activeMenuId = response.menu?.id || null;
+        loadMenus(activeMenuId);
+      })
+      .fail((xhr) => alert(xhr.responseJSON?.error || 'Menü oluşturulamadı.'));
+  });
+
+  $('#menu-editor').on('click', '#add-menu-item', function () {
+    const container = $('#menu-items');
+    container.find('.text-secondary').remove();
+    container.append(renderMenuItemRow());
+  });
+
+  $('#menu-editor').on('click', '.remove-menu-item', function () {
+    $(this).closest('[data-menu-item]').remove();
+  });
+
+  $('#menu-editor').on('submit', '#menu-details', function (event) {
+    event.preventDefault();
+    const form = $(this);
+    const message = form.find('#menu-message');
+    const menuId = form.data('menu-id');
+    $.post('api.php?action=update-menu', {
+      id: menuId,
+      name: form.find('[name="name"]').val(),
+      location: form.find('[name="location"]').val(),
+    })
+      .done((response) => {
+        message.text(response.message).removeClass('text-danger').addClass('text-success');
+        loadMenus(response.menu?.id);
+      })
+      .fail((xhr) => {
+        message.text(xhr.responseJSON?.error || 'Menü güncellenemedi').removeClass('text-success').addClass('text-danger');
+      });
+  });
+
+  $('#menu-editor').on('click', '#save-menu-items', function () {
+    const form = $('#menu-details');
+    if (!form.length) return;
+    const menuId = form.data('menu-id');
+    const message = form.find('#menu-message');
+    const items = [];
+    form.find('[data-menu-item]').each(function () {
+      const row = $(this);
+      const label = row.find('[name="label"]').val();
+      const url = row.find('[name="url"]').val();
+      if (!label || !url) {
+        return;
+      }
+      items.push({
+        label,
+        url,
+        target: row.find('[name="target"]').val(),
+        sort_order: row.find('[name="sort_order"]').val(),
+      });
+    });
+
+    $.post('api.php?action=save-menu-items', {
+      menu_id: menuId,
+      items: JSON.stringify(items),
+    })
+      .done((response) => {
+        message.text(response.message).removeClass('text-danger').addClass('text-success');
+        loadMenus(response.menu?.id);
+      })
+      .fail((xhr) => {
+        message.text(xhr.responseJSON?.error || 'Menü öğeleri kaydedilemedi').removeClass('text-success').addClass('text-danger');
+      });
+  });
+
+  $('#menu-editor').on('click', '#delete-menu', function () {
+    const form = $('#menu-details');
+    if (!form.length) return;
+    const menuId = form.data('menu-id');
+    if (!window.confirm('Menüyü silmek istediğinize emin misiniz?')) {
+      return;
+    }
+    $.post('api.php?action=delete-menu', { id: menuId })
+      .done(() => {
+        activeMenuId = null;
+        loadMenus();
+      })
+      .fail((xhr) => alert(xhr.responseJSON?.error || 'Menü silinemedi.'));
+  });
+
   loadUsers();
   loadFtpSettings();
+  loadBranding();
+  loadAdSettings();
+  loadAnalyticsSettings();
+  loadMenus();
 });

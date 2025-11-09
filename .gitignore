@@ -3,5 +3,12 @@
 /.env
 /node_modules/
 .DS_Store
-/public/uploads/
+/public/uploads/*
+!/public/uploads/.gitignore
+!/public/uploads/chapters/
+/public/uploads/chapters/*
+!/public/uploads/chapters/.gitignore
+!/public/uploads/branding/
+/public/uploads/branding/*
+!/public/uploads/branding/.gitignore
 /composer.lock
