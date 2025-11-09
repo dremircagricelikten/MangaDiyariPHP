@@ -11,7 +11,7 @@ $(function () {
     $.getJSON('api.php', { action: 'chapter', slug, chapter: number })
       .done(({ data, manga, prev, next }) => {
         $('#chapter-title').text(`${manga.title} - Bölüm ${data.number} ${data.title ? '· ' + data.title : ''}`);
-        $('#chapter-content').html(formatContent(data.content));
+        $('#chapter-content').html(formatContent(data.content, data.assets));
         $('#prev-chapter').toggleClass('disabled', !prev).attr('href', prev ? `chapter.php?slug=${slug}&chapter=${prev.number}` : '#');
         $('#next-chapter').toggleClass('disabled', !next).attr('href', next ? `chapter.php?slug=${slug}&chapter=${next.number}` : '#');
 
@@ -44,26 +44,45 @@ $(function () {
     }
   });
 
-  function formatContent(content) {
-    if (!content) {
+  function formatContent(content, assets = []) {
+    const hasAssets = Array.isArray(assets) && assets.length > 0;
+    const hasContent = typeof content === 'string' && content.trim() !== '';
+
+    if (!hasAssets && !hasContent) {
       return '<p class="text-secondary">Bu bölüm için henüz içerik eklenmemiş.</p>';
     }
 
-    if (content.includes('\n')) {
-      return content
-        .split(/\n+/)
-        .map((line) => `<p>${line}</p>`)
-        .join('');
+    const parts = [];
+
+    if (hasContent) {
+      if (content.includes('\n')) {
+        parts.push(
+          content
+            .split(/\n+/)
+            .map((line) => `<p>${line}</p>`)
+            .join('')
+        );
+      } else if (content.includes('http')) {
+        parts.push(
+          content
+            .split(/\s+/)
+            .map((url) => `<img class="img-fluid mb-3 rounded" src="${url}" alt="Bölüm sayfası">`)
+            .join('')
+        );
+      } else {
+        parts.push(`<p>${content}</p>`);
+      }
     }
 
-    if (content.includes('http')) {
-      return content
-        .split(/\s+/)
-        .map((url) => `<img class="img-fluid mb-3 rounded" src="${url}" alt="Bölüm sayfası">`)
-        .join('');
+    if (hasAssets) {
+      parts.push(
+        assets
+          .map((asset) => `<img class="img-fluid mb-3 rounded" src="/${asset}" alt="Bölüm sayfası">`)
+          .join('')
+      );
     }
 
-    return `<p>${content}</p>`;
+    return parts.join('');
   }
 
   loadChapter(chapterNumber);

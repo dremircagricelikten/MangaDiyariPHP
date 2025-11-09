@@ -2,19 +2,22 @@
 
 namespace MangaDiyari\Core;
 
-use PDO;
 use DateTimeImmutable;
+use PDO;
 
 class MangaRepository
 {
+    private string $driver;
+
     public function __construct(private PDO $db)
     {
+        $this->driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
     }
 
     public function create(array $data): array
     {
         $slug = $data['slug'] ?? Slugger::slugify($data['title']);
-        $now = (new DateTimeImmutable())->format('c');
+        $timestamp = (new DateTimeImmutable())->format('Y-m-d H:i:s');
 
         $stmt = $this->db->prepare('INSERT INTO mangas (title, slug, description, cover_image, author, status, genres, tags, created_at, updated_at)
             VALUES (:title, :slug, :description, :cover_image, :author, :status, :genres, :tags, :created_at, :updated_at)');
@@ -28,8 +31,8 @@ class MangaRepository
             ':status' => $data['status'] ?? 'ongoing',
             ':genres' => $data['genres'] ?? '',
             ':tags' => $data['tags'] ?? '',
-            ':created_at' => $now,
-            ':updated_at' => $now,
+            ':created_at' => $timestamp,
+            ':updated_at' => $timestamp,
         ]);
 
         return $this->findById((int) $this->db->lastInsertId());
@@ -52,7 +55,7 @@ class MangaRepository
             ':status' => $data['status'] ?? $existing['status'],
             ':genres' => $data['genres'] ?? $existing['genres'],
             ':tags' => $data['tags'] ?? $existing['tags'],
-            ':updated_at' => (new DateTimeImmutable())->format('c'),
+            ':updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
 
         return $this->findById($id);
@@ -110,11 +113,12 @@ class MangaRepository
         $status = $options['status'] ?? null;
         $sort = $options['sort'] ?? 'random';
 
+        $randomFunction = $this->driver === 'mysql' ? 'RAND()' : 'RANDOM()';
         $orderBy = match ($sort) {
             'newest' => 'created_at DESC',
-            'alphabetical' => 'title COLLATE NOCASE ASC',
+            'alphabetical' => 'LOWER(title) ASC',
             'updated' => 'updated_at DESC',
-            default => 'RANDOM()',
+            default => $randomFunction,
         };
 
         $query = 'SELECT * FROM mangas';

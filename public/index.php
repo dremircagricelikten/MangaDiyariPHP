@@ -3,17 +3,22 @@ require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/WidgetRepository.php';
+require_once __DIR__ . '/../src/SiteContext.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
 use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\WidgetRepository;
+use MangaDiyari\Core\SiteContext;
 
 Auth::start();
 $user = Auth::user();
 
-$config = require __DIR__ . '/../config.php';
-$site = $config['site'];
+$context = SiteContext::build();
+$site = $context['site'];
+$menus = $context['menus'];
+$ads = $context['ads'];
+$analytics = $context['analytics'];
 
 $pdo = Database::getConnection();
 $settingRepo = new SettingRepository($pdo);
@@ -35,6 +40,9 @@ foreach ($widgetRepo->getActive() as $widget) {
 
 $popularWidget = $activeWidgets['popular_slider'] ?? null;
 $latestWidget = $activeWidgets['latest_updates'] ?? null;
+
+$primaryMenuItems = $menus['primary']['items'] ?? [];
+$footerMenuItems = $menus['footer']['items'] ?? [];
 ?>
 <!doctype html>
 <html lang="tr">
@@ -42,6 +50,12 @@ $latestWidget = $activeWidgets['latest_updates'] ?? null;
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title><?= htmlspecialchars($site['name']) ?> - <?= htmlspecialchars($site['tagline']) ?></title>
+    <?php if (!empty($analytics['search_console'])): ?>
+      <?= $analytics['search_console'] ?>
+    <?php endif; ?>
+    <?php if (!empty($analytics['google'])): ?>
+      <?= $analytics['google'] ?>
+    <?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="assets/styles.css">
     <style>
@@ -55,20 +69,25 @@ $latestWidget = $activeWidgets['latest_updates'] ?? null;
     </style>
   </head>
   <body class="bg-dark text-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient shadow-sm">
       <div class="container">
-        <a class="navbar-brand" href="/"><?= htmlspecialchars($site['name']) ?></a>
+        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
+          <?php if (!empty($site['logo'])): ?>
+            <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
+          <?php endif; ?>
+          <span><?= htmlspecialchars($site['name']) ?></span>
+        </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
           <span class="navbar-toggler-icon"></span>
         </button>
         <div class="collapse navbar-collapse" id="navbarContent">
           <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
-            <li class="nav-item"><a class="nav-link" href="/">Anasayfa</a></li>
-            <?php if ($popularWidget): ?>
-              <li class="nav-item"><a class="nav-link" href="#populer">Popüler</a></li>
-            <?php endif; ?>
-            <?php if ($latestWidget): ?>
-              <li class="nav-item"><a class="nav-link" href="#latest-updates">Yeni Bölümler</a></li>
+            <?php if (!empty($primaryMenuItems)): ?>
+              <?php foreach ($primaryMenuItems as $item): ?>
+                <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <li class="nav-item"><a class="nav-link" href="/">Anasayfa</a></li>
             <?php endif; ?>
             <?php if ($user && in_array($user['role'], ['admin', 'editor'], true)): ?>
               <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
@@ -86,6 +105,16 @@ $latestWidget = $activeWidgets['latest_updates'] ?? null;
         </div>
       </div>
     </nav>
+
+    <?php if (!empty($ads['header'])): ?>
+      <section class="ad-slot ad-slot--header py-3">
+        <div class="container">
+          <div class="ad-wrapper text-center">
+            <?= $ads['header'] ?>
+          </div>
+        </div>
+      </section>
+    <?php endif; ?>
 
     <?php if ($popularWidget): ?>
     <header class="hero py-5">
@@ -177,58 +206,83 @@ $latestWidget = $activeWidgets['latest_updates'] ?? null;
     <?php endif; ?>
 
     <main class="container my-5">
-      <?php if ($latestWidget): ?>
-      <section id="latest-updates" class="mb-5">
-        <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
-          <div>
-            <h2 class="section-title mb-0"><?= htmlspecialchars($latestWidget['title']) ?></h2>
-            <span class="text-secondary small">Yeni yüklenen bölümleri anında görüntüleyin.</span>
-          </div>
-          <div class="widget-controls d-flex gap-2 flex-wrap">
-            <div>
-              <label for="latest-sort" class="form-label small text-uppercase">Sıralama</label>
-              <select id="latest-sort" class="form-select form-select-sm">
-                <option value="newest">En Yeni</option>
-                <option value="oldest">En Eski</option>
-                <option value="chapter_desc">Bölüm No (Azalan)</option>
-                <option value="chapter_asc">Bölüm No (Artan)</option>
-              </select>
+      <div class="row g-4">
+        <div class="col-lg-9">
+          <?php if ($latestWidget): ?>
+          <section id="latest-updates" class="mb-5">
+            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
+              <div>
+                <h2 class="section-title mb-0"><?= htmlspecialchars($latestWidget['title']) ?></h2>
+                <span class="text-secondary small">Yeni yüklenen bölümleri anında görüntüleyin.</span>
+              </div>
+              <div class="widget-controls d-flex gap-2 flex-wrap">
+                <div>
+                  <label for="latest-sort" class="form-label small text-uppercase">Sıralama</label>
+                  <select id="latest-sort" class="form-select form-select-sm">
+                    <option value="newest">En Yeni</option>
+                    <option value="oldest">En Eski</option>
+                    <option value="chapter_desc">Bölüm No (Azalan)</option>
+                    <option value="chapter_asc">Bölüm No (Artan)</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="latest-status" class="form-label small text-uppercase">Durum</label>
+                  <select id="latest-status" class="form-select form-select-sm">
+                    <option value="">Tümü</option>
+                    <option value="ongoing">Devam Ediyor</option>
+                    <option value="completed">Tamamlandı</option>
+                    <option value="hiatus">Ara Verildi</option>
+                  </select>
+                </div>
+              </div>
             </div>
-            <div>
-              <label for="latest-status" class="form-label small text-uppercase">Durum</label>
-              <select id="latest-status" class="form-select form-select-sm">
-                <option value="">Tümü</option>
-                <option value="ongoing">Devam Ediyor</option>
-                <option value="completed">Tamamlandı</option>
-                <option value="hiatus">Ara Verildi</option>
-              </select>
+            <div class="row" id="latest-list"></div>
+          </section>
+          <?php endif; ?>
+
+          <section id="yeniler" class="mb-5">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h2 class="section-title">Koleksiyon</h2>
+              <span class="text-secondary">Arama sonuçları anlık olarak güncellenir.</span>
             </div>
-          </div>
-        </div>
-        <div class="row" id="latest-list"></div>
-      </section>
-      <?php endif; ?>
+            <div class="row" id="manga-list"></div>
+          </section>
 
-      <section id="yeniler" class="mb-5">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-          <h2 class="section-title">Koleksiyon</h2>
-          <span class="text-secondary">Arama sonuçları anlık olarak güncellenir.</span>
+          <?php if ($popularWidget): ?>
+          <section id="populer" class="mb-5">
+            <h2 class="section-title"><?= htmlspecialchars($popularWidget['title']) ?></h2>
+            <div class="row" id="featured-list"></div>
+          </section>
+          <?php endif; ?>
         </div>
-        <div class="row" id="manga-list"></div>
-      </section>
-
-      <?php if ($popularWidget): ?>
-      <section id="populer" class="mb-5">
-        <h2 class="section-title"><?= htmlspecialchars($popularWidget['title']) ?></h2>
-        <div class="row" id="featured-list"></div>
-      </section>
-      <?php endif; ?>
+        <?php if (!empty($ads['sidebar'])): ?>
+          <aside class="col-lg-3">
+            <div class="ad-slot ad-slot--sidebar sticky-lg-top">
+              <?= $ads['sidebar'] ?>
+            </div>
+          </aside>
+        <?php endif; ?>
+      </div>
     </main>
 
-    <footer class="py-4 bg-black text-center text-secondary">
-      <div class="container">
+    <footer class="py-4 bg-black text-secondary">
+      <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
         <small>© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>. Tüm hakları saklıdır.</small>
+        <?php if (!empty($footerMenuItems)): ?>
+          <ul class="nav footer-menu">
+            <?php foreach ($footerMenuItems as $item): ?>
+              <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
+            <?php endforeach; ?>
+          </ul>
+        <?php endif; ?>
       </div>
+      <?php if (!empty($ads['footer'])): ?>
+        <div class="container mt-3">
+          <div class="ad-slot ad-slot--footer text-center">
+            <?= $ads['footer'] ?>
+          </div>
+        </div>
+      <?php endif; ?>
     </footer>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>

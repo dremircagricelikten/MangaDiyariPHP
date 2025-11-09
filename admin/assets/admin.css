@@ -14,17 +14,62 @@ textarea {
   resize: vertical;
 }
 
-.avatar-placeholder {
+.brand-logo {
   width: 36px;
   height: 36px;
+  object-fit: contain;
+}
+
+.admin-sidebar {
+  top: 6rem;
+}
+
+.admin-sidebar .nav-link {
+  color: rgba(255, 255, 255, 0.7);
+  border-radius: 999px;
+  padding: 0.55rem 1rem;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.admin-sidebar .nav-link:hover,
+.admin-sidebar .nav-link:focus {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.avatar-circle {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(255, 255, 255, 0.1);
-  color: #fff;
   font-weight: 600;
-  text-transform: uppercase;
+  font-size: 1.25rem;
+}
+
+.bullet {
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
+  background: rgba(255, 255, 255, 0.45);
+  display: inline-block;
+}
+
+.section-heading .text-muted {
+  max-width: 600px;
+}
+
+.upload-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+@media (min-width: 576px) {
+  .upload-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 #user-table td {
@@ -40,4 +85,35 @@ textarea {
 
 #user-table .form-control::placeholder {
   color: rgba(255, 255, 255, 0.6);
+}
+
+.list-group-item {
+  background-color: rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.list-group-item.active {
+  background: linear-gradient(120deg, rgba(95, 44, 130, 0.6), rgba(73, 160, 157, 0.6));
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.form-text {
+  color: rgba(255, 255, 255, 0.6);
+}
+
+#menu-editor .menu-item-row {
+  border: 1px dashed rgba(255, 255, 255, 0.2);
+  border-radius: 0.75rem;
+  padding: 1rem;
+  background-color: rgba(0, 0, 0, 0.2);
+}
+
+#menu-editor .menu-item-row + .menu-item-row {
+  margin-top: 1rem;
+}
+
+#menu-editor .drag-handle {
+  cursor: grab;
+  color: rgba(255, 255, 255, 0.4);
 }

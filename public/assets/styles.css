@@ -7,6 +7,12 @@ body {
   background: linear-gradient(90deg, var(--gradient-start) 0%, var(--gradient-end) 100%);
 }
 
+.brand-logo {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
 .hero {
   background: radial-gradient(circle at top left, color-mix(in srgb, var(--gradient-start) 55%, transparent), rgba(0, 0, 0, 0.85));
 }
@@ -61,4 +67,31 @@ body {
 
 .chapter-content img {
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+}
+
+.ad-slot {
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.ad-slot--sidebar {
+  position: relative;
+  top: 0;
+}
+
+.ad-slot--footer {
+  background: transparent;
+  border: none;
+}
+
+.footer-menu .nav-link {
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0.25rem 0.75rem;
+}
+
+.footer-menu .nav-link:hover,
+.footer-menu .nav-link:focus {
+  color: #fff;
 }

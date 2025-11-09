@@ -2,27 +2,32 @@
 
 namespace MangaDiyari\Core;
 
-use PDO;
 use DateTimeImmutable;
+use PDO;
 
 class ChapterRepository
 {
+    private string $driver;
+
     public function __construct(private PDO $db)
     {
+        $this->driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
     }
 
     public function create(int $mangaId, array $data): array
     {
-        $now = (new DateTimeImmutable())->format('c');
+        $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
+        $assets = $data['assets'] ?? [];
 
-        $stmt = $this->db->prepare('INSERT INTO chapters (manga_id, number, title, content, created_at, updated_at)
-            VALUES (:manga_id, :number, :title, :content, :created_at, :updated_at)');
+        $stmt = $this->db->prepare('INSERT INTO chapters (manga_id, number, title, content, assets, created_at, updated_at)
+            VALUES (:manga_id, :number, :title, :content, :assets, :created_at, :updated_at)');
 
         $stmt->execute([
             ':manga_id' => $mangaId,
             ':number' => $data['number'],
             ':title' => $data['title'] ?? '',
             ':content' => $data['content'] ?? '',
+            ':assets' => json_encode($assets, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
             ':created_at' => $now,
             ':updated_at' => $now,
         ]);
@@ -37,13 +42,14 @@ class ChapterRepository
             return null;
         }
 
-        $stmt = $this->db->prepare('UPDATE chapters SET title = :title, content = :content, number = :number, updated_at = :updated_at WHERE id = :id');
+        $stmt = $this->db->prepare('UPDATE chapters SET title = :title, content = :content, number = :number, assets = :assets, updated_at = :updated_at WHERE id = :id');
         $stmt->execute([
             ':id' => $id,
             ':title' => $data['title'] ?? $existing['title'],
             ':content' => $data['content'] ?? $existing['content'],
             ':number' => $data['number'] ?? $existing['number'],
-            ':updated_at' => (new DateTimeImmutable())->format('c'),
+            ':assets' => json_encode($data['assets'] ?? $existing['assets'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ':updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
 
         return $this->findById($id);
@@ -55,15 +61,15 @@ class ChapterRepository
         $stmt->execute([':id' => $id]);
         $chapter = $stmt->fetch(PDO::FETCH_ASSOC);
 
-        return $chapter ?: null;
+        return $chapter ? $this->hydrate($chapter) : null;
     }
 
     public function listByManga(int $mangaId): array
     {
-        $stmt = $this->db->prepare('SELECT * FROM chapters WHERE manga_id = :manga_id ORDER BY number DESC');
+        $stmt = $this->db->prepare('SELECT * FROM chapters WHERE manga_id = :manga_id ORDER BY ' . $this->numericOrder('number') . ' DESC');
         $stmt->execute([':manga_id' => $mangaId]);
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return array_map(fn(array $row) => $this->hydrate($row), $stmt->fetchAll(PDO::FETCH_ASSOC));
     }
 
     public function findByMangaAndNumber(int $mangaId, string $number): ?array
@@ -75,31 +81,31 @@ class ChapterRepository
         ]);
 
         $chapter = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $chapter ?: null;
+        return $chapter ? $this->hydrate($chapter) : null;
     }
 
     public function getPreviousChapter(int $mangaId, float $number): ?array
     {
-        $stmt = $this->db->prepare('SELECT * FROM chapters WHERE manga_id = :manga_id AND number < :number ORDER BY number DESC LIMIT 1');
+        $stmt = $this->db->prepare('SELECT * FROM chapters WHERE manga_id = :manga_id AND ' . $this->numericOrder('number') . ' < :number ORDER BY ' . $this->numericOrder('number') . ' DESC LIMIT 1');
         $stmt->execute([
             ':manga_id' => $mangaId,
             ':number' => $number,
         ]);
 
         $chapter = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $chapter ?: null;
+        return $chapter ? $this->hydrate($chapter) : null;
     }
 
     public function getNextChapter(int $mangaId, float $number): ?array
     {
-        $stmt = $this->db->prepare('SELECT * FROM chapters WHERE manga_id = :manga_id AND number > :number ORDER BY number ASC LIMIT 1');
+        $stmt = $this->db->prepare('SELECT * FROM chapters WHERE manga_id = :manga_id AND ' . $this->numericOrder('number') . ' > :number ORDER BY ' . $this->numericOrder('number') . ' ASC LIMIT 1');
         $stmt->execute([
             ':manga_id' => $mangaId,
             ':number' => $number,
         ]);
 
         $chapter = $stmt->fetch(PDO::FETCH_ASSOC);
-        return $chapter ?: null;
+        return $chapter ? $this->hydrate($chapter) : null;
     }
 
     public function getLatestChapters(int $limit = 8, array $options = []): array
@@ -110,8 +116,8 @@ class ChapterRepository
 
         $orderBy = match ($sort) {
             'oldest' => 'chapters.created_at ASC',
-            'chapter_desc' => 'CAST(chapters.number AS REAL) DESC',
-            'chapter_asc' => 'CAST(chapters.number AS REAL) ASC',
+            'chapter_desc' => $this->numericOrder('chapters.number') . ' DESC',
+            'chapter_asc' => $this->numericOrder('chapters.number') . ' ASC',
             default => 'chapters.created_at DESC',
         };
 
@@ -138,6 +144,22 @@ class ChapterRepository
         $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
         $stmt->execute();
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        return array_map(fn(array $row) => $this->hydrate($row), $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    private function hydrate(array $row): array
+    {
+        $row['id'] = (int) $row['id'];
+        $row['manga_id'] = (int) $row['manga_id'];
+        $row['assets'] = $row['assets'] ? json_decode($row['assets'], true) ?: [] : [];
+
+        return $row;
+    }
+
+    private function numericOrder(string $column): string
+    {
+        return $this->driver === 'mysql'
+            ? "CAST({$column} AS DECIMAL(10,2))"
+            : "CAST({$column} AS REAL)";
     }
 }
