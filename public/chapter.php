@@ -23,6 +23,7 @@ $analytics = $context['analytics'];
 
 $pdo = Database::getConnection();
 $settingRepo = new SettingRepository($pdo);
+$allSettings = $settingRepo->all();
 $themeDefaults = [
     'primary_color' => '#5f2c82',
     'accent_color' => '#49a09d',
@@ -30,7 +31,14 @@ $themeDefaults = [
     'gradient_start' => '#5f2c82',
     'gradient_end' => '#49a09d',
 ];
-$theme = array_replace($themeDefaults, $settingRepo->all());
+$theme = array_replace($themeDefaults, $allSettings);
+$kiSettings = [
+    'currency_name' => $allSettings['ki_currency_name'] ?? 'Ki',
+    'comment_reward' => (int) ($allSettings['ki_comment_reward'] ?? 0),
+    'reaction_reward' => (int) ($allSettings['ki_reaction_reward'] ?? 0),
+    'chat_reward_per_minute' => (int) ($allSettings['ki_chat_reward_per_minute'] ?? 0),
+    'read_reward_per_minute' => (int) ($allSettings['ki_read_reward_per_minute'] ?? 0),
+];
 
 $primaryMenuItems = $menus['primary']['items'] ?? [];
 $footerMenuItems = $menus['footer']['items'] ?? [];
@@ -78,6 +86,9 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                 <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
               <?php endforeach; ?>
             <?php endif; ?>
+            <?php if ($user): ?>
+              <li class="nav-item"><span class="nav-link">Bakiye: <strong id="nav-ki-balance"><?= (int) ($user['ki_balance'] ?? 0) ?></strong> <?= htmlspecialchars($kiSettings['currency_name']) ?></span></li>
+            <?php endif; ?>
             <?php if ($user && in_array($user['role'], ['admin', 'editor'], true)): ?>
               <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
             <?php endif; ?>
@@ -108,6 +119,14 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     <main class="container my-4" id="chapter-reader" data-slug="<?= htmlspecialchars($slug) ?>" data-chapter="<?= htmlspecialchars($chapterNumber) ?>">
       <div class="row g-4">
         <div class="<?php if (!empty($ads['sidebar'])): ?>col-lg-9<?php else: ?>col-12<?php endif; ?>">
+          <div id="ki-balance-banner" class="alert alert-secondary d-flex justify-content-between align-items-center gap-3 mb-4">
+            <div>
+              <strong>Toplam <?= htmlspecialchars($kiSettings['currency_name']) ?>:</strong>
+              <span id="ki-balance-value" data-currency="<?= htmlspecialchars($kiSettings['currency_name']) ?>"><?= $user['ki_balance'] ?? 0 ?></span>
+            </div>
+            <button class="btn btn-outline-light btn-sm" type="button" id="open-ki-modal">Kazançları Görüntüle</button>
+          </div>
+          <div id="ki-context-details" class="alert alert-info d-none"></div>
           <div class="reader-header mb-4">
             <h1 class="h3" id="chapter-title"></h1>
             <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -116,7 +135,30 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
               <select class="form-select form-select-sm w-auto" id="chapter-select"></select>
             </div>
           </div>
+          <div id="chapter-lock-state" class="mb-4"></div>
           <article class="chapter-content" id="chapter-content"></article>
+          <section id="comment-section" class="mt-5" data-currency="<?= htmlspecialchars($kiSettings['currency_name']) ?>">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+              <h2 class="h4 mb-0">Yorumlar</h2>
+              <button class="btn btn-outline-light btn-sm" id="refresh-comments" type="button">Yenile</button>
+            </div>
+            <?php if ($user): ?>
+            <form id="comment-form" class="mb-3">
+              <div class="mb-2">
+                <textarea class="form-control" name="body" rows="3" placeholder="Düşüncelerini paylaş..." required></textarea>
+              </div>
+              <input type="hidden" name="chapter_id" id="comment-chapter-id" value="">
+              <input type="hidden" name="manga_id" id="comment-manga-id" value="">
+              <div class="d-flex justify-content-between align-items-center gap-3">
+                <small class="text-secondary">Yorum başına <?= (int) $kiSettings['comment_reward'] ?> <?= htmlspecialchars($kiSettings['currency_name']) ?> kazanırsınız.</small>
+                <button class="btn btn-primary" type="submit">Yorumu Gönder</button>
+              </div>
+            </form>
+            <?php else: ?>
+            <div class="alert alert-warning">Yorum yapmak için <a class="alert-link" href="login.php">giriş yapın</a>.</div>
+            <?php endif; ?>
+            <div id="comment-list" class="list-group"></div>
+          </section>
         </div>
         <?php if (!empty($ads['sidebar'])): ?>
           <aside class="col-lg-3">
@@ -127,6 +169,27 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
         <?php endif; ?>
       </div>
     </main>
+
+    <div id="site-chat-widget" class="chat-widget minimized" data-page="chapter">
+      <div class="chat-header">
+        <strong>Sohbet</strong>
+        <button class="btn-close btn-close-white" type="button" aria-label="Kapat"></button>
+      </div>
+      <div class="chat-body">
+        <div class="chat-messages" id="chat-messages"></div>
+      </div>
+      <div class="chat-footer">
+        <?php if ($user): ?>
+          <form id="chat-form" class="d-flex gap-2">
+            <input type="text" class="form-control" name="message" placeholder="Mesaj yaz..." autocomplete="off" required>
+            <button class="btn btn-primary" type="submit">Gönder</button>
+          </form>
+        <?php else: ?>
+          <div class="text-center small">Sohbete katılmak için <a href="login.php">giriş yapın</a>.</div>
+        <?php endif; ?>
+      </div>
+      <button class="chat-toggle btn btn-primary rounded-circle" type="button" aria-label="Sohbeti aç">💬</button>
+    </div>
 
     <footer class="py-4 bg-black text-secondary">
       <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
@@ -150,6 +213,15 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      window.currentUser = <?= json_encode($user ? [
+          'id' => $user['id'],
+          'username' => $user['username'],
+          'ki_balance' => $user['ki_balance'] ?? 0,
+      ] : null, JSON_UNESCAPED_UNICODE) ?>;
+      window.kiSettings = <?= json_encode($kiSettings, JSON_UNESCAPED_UNICODE) ?>;
+    </script>
+    <script src="assets/chat.js"></script>
     <script src="assets/chapter.js"></script>
   </body>
 </html>

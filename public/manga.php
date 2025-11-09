@@ -22,6 +22,7 @@ $analytics = $context['analytics'];
 
 $pdo = Database::getConnection();
 $settingRepo = new SettingRepository($pdo);
+$allSettings = $settingRepo->all();
 $themeDefaults = [
     'primary_color' => '#5f2c82',
     'accent_color' => '#49a09d',
@@ -29,7 +30,10 @@ $themeDefaults = [
     'gradient_start' => '#5f2c82',
     'gradient_end' => '#49a09d',
 ];
-$theme = array_replace($themeDefaults, $settingRepo->all());
+$theme = array_replace($themeDefaults, $allSettings);
+$kiSettings = [
+    'currency_name' => $allSettings['ki_currency_name'] ?? 'Ki',
+];
 
 $primaryMenuItems = $menus['primary']['items'] ?? [];
 $footerMenuItems = $menus['footer']['items'] ?? [];
@@ -76,6 +80,9 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
               <?php foreach ($primaryMenuItems as $item): ?>
                 <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
               <?php endforeach; ?>
+            <?php endif; ?>
+            <?php if ($user): ?>
+              <li class="nav-item"><span class="nav-link">Bakiye: <strong id="nav-ki-balance"><?= (int) ($user['ki_balance'] ?? 0) ?></strong> <?= htmlspecialchars($kiSettings['currency_name']) ?></span></li>
             <?php endif; ?>
             <?php if ($user && in_array($user['role'], ['admin', 'editor'], true)): ?>
               <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
@@ -140,6 +147,27 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       </div>
     </main>
 
+    <div id="site-chat-widget" class="chat-widget minimized" data-page="manga">
+      <div class="chat-header">
+        <strong>Sohbet</strong>
+        <button class="btn-close btn-close-white" type="button" aria-label="Kapat"></button>
+      </div>
+      <div class="chat-body">
+        <div class="chat-messages" id="chat-messages"></div>
+      </div>
+      <div class="chat-footer">
+        <?php if ($user): ?>
+          <form id="chat-form" class="d-flex gap-2">
+            <input type="text" class="form-control" name="message" placeholder="Mesaj yaz..." autocomplete="off" required>
+            <button class="btn btn-primary" type="submit">Gönder</button>
+          </form>
+        <?php else: ?>
+          <div class="text-center small">Sohbet için <a href="login.php">giriş yapın</a>.</div>
+        <?php endif; ?>
+      </div>
+      <button class="chat-toggle btn btn-primary rounded-circle" type="button" aria-label="Sohbeti aç">💬</button>
+    </div>
+
     <footer class="py-4 bg-black text-secondary">
       <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
         <small>© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>. Tüm hakları saklıdır.</small>
@@ -162,6 +190,15 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+      window.currentUser = <?= json_encode($user ? [
+          'id' => $user['id'],
+          'username' => $user['username'],
+          'ki_balance' => $user['ki_balance'] ?? 0,
+      ] : null, JSON_UNESCAPED_UNICODE) ?>;
+      window.kiSettings = <?= json_encode($kiSettings, JSON_UNESCAPED_UNICODE) ?>;
+    </script>
+    <script src="assets/chat.js"></script>
     <script src="assets/manga.js"></script>
   </body>
 </html>

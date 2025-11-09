@@ -16,6 +16,7 @@ require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/WidgetRepository.php';
 require_once __DIR__ . '/../src/UserRepository.php';
 require_once __DIR__ . '/../src/MenuRepository.php';
+require_once __DIR__ . '/../src/KiRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
@@ -26,6 +27,7 @@ use MangaDiyari\Core\WidgetRepository;
 use MangaDiyari\Core\UserRepository;
 use MangaDiyari\Core\MenuRepository;
 use MangaDiyari\Core\Slugger;
+use MangaDiyari\Core\KiRepository;
 
 Auth::start();
 if (!Auth::checkRole(['admin', 'editor'])) {
@@ -42,6 +44,7 @@ try {
     $widgetRepo = new WidgetRepository($pdo);
     $userRepo = new UserRepository($pdo);
     $menuRepo = new MenuRepository($pdo);
+    $kiRepo = new KiRepository($pdo);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
@@ -84,6 +87,18 @@ try {
             $number = trim((string) $_POST['number']);
             $content = trim((string) ($_POST['content'] ?? ''));
             $title = trim((string) ($_POST['title'] ?? ''));
+            $kiCost = isset($_POST['ki_cost']) ? max(0, (int) $_POST['ki_cost']) : 0;
+            $premiumDuration = isset($_POST['premium_duration_hours']) ? max(0, (int) $_POST['premium_duration_hours']) : null;
+
+            if ($premiumDuration === null && $kiCost > 0) {
+                $defaultDuration = (int) ($settingRepo->get('ki_unlock_default_duration', '0') ?? 0);
+                $premiumDuration = $defaultDuration > 0 ? $defaultDuration : null;
+            }
+
+            $premiumExpiresAt = null;
+            if ($kiCost > 0 && $premiumDuration) {
+                $premiumExpiresAt = (new DateTimeImmutable())->add(new DateInterval('PT' . $premiumDuration . 'H'))->format('Y-m-d H:i:s');
+            }
 
             $preparedAssets = prepareChapterAssets();
 
@@ -92,6 +107,8 @@ try {
                 'title' => $title,
                 'content' => $content,
                 'assets' => [],
+                'ki_cost' => $kiCost,
+                'premium_expires_at' => $premiumExpiresAt,
             ]);
 
             if (!empty($preparedAssets)) {
@@ -102,6 +119,61 @@ try {
             }
 
             echo json_encode(['message' => 'Bölüm başarıyla oluşturuldu', 'chapter' => $chapter]);
+            break;
+        case 'get-ki-settings':
+            $settings = $settingRepo->all();
+            $payload = [
+                'currency_name' => $settings['ki_currency_name'] ?? 'Ki',
+                'comment_reward' => (int) ($settings['ki_comment_reward'] ?? 0),
+                'reaction_reward' => (int) ($settings['ki_reaction_reward'] ?? 0),
+                'chat_reward_per_minute' => (int) ($settings['ki_chat_reward_per_minute'] ?? 0),
+                'read_reward_per_minute' => (int) ($settings['ki_read_reward_per_minute'] ?? 0),
+                'market_enabled' => (int) ($settings['ki_market_enabled'] ?? 1),
+                'unlock_default_duration' => (int) ($settings['ki_unlock_default_duration'] ?? 0),
+            ];
+
+            echo json_encode(['data' => $payload]);
+            break;
+        case 'update-ki-settings':
+            $updates = [];
+            $map = [
+                'currency_name' => 'ki_currency_name',
+                'comment_reward' => 'ki_comment_reward',
+                'reaction_reward' => 'ki_reaction_reward',
+                'chat_reward_per_minute' => 'ki_chat_reward_per_minute',
+                'read_reward_per_minute' => 'ki_read_reward_per_minute',
+                'market_enabled' => 'ki_market_enabled',
+                'unlock_default_duration' => 'ki_unlock_default_duration',
+            ];
+
+            foreach ($map as $input => $key) {
+                if (!isset($_POST[$input])) {
+                    continue;
+                }
+
+                $value = (string) $_POST[$input];
+                $settingRepo->set($key, $value);
+                $updates[$key] = $value;
+            }
+
+            echo json_encode(['message' => 'Ki ayarları güncellendi', 'data' => $updates]);
+            break;
+        case 'list-market-offers':
+            $offers = $kiRepo->listMarketOffers(false);
+            echo json_encode(['data' => $offers]);
+            break;
+        case 'save-market-offer':
+            $offer = $kiRepo->saveMarketOffer($_POST);
+            echo json_encode(['message' => 'Market teklifi kaydedildi', 'offer' => $offer]);
+            break;
+        case 'delete-market-offer':
+            $offerId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($offerId <= 0) {
+                throw new InvalidArgumentException('Geçersiz teklif');
+            }
+
+            $kiRepo->deleteMarketOffer($offerId);
+            echo json_encode(['message' => 'Teklif silindi']);
             break;
         case 'get-settings':
             $settings = $settingRepo->all();

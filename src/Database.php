@@ -3,6 +3,7 @@
 namespace MangaDiyari\Core;
 
 use DateTimeImmutable;
+use InvalidArgumentException;
 use PDO;
 use PDOException;
 
@@ -134,6 +135,7 @@ class Database
             avatar_url TEXT NULL,
             website_url TEXT NULL,
             is_active TINYINT(1) NOT NULL DEFAULT 1,
+            ki_balance BIGINT NOT NULL DEFAULT 0,
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
@@ -159,9 +161,78 @@ class Database
             title VARCHAR(255) NULL,
             content LONGTEXT NULL,
             assets LONGTEXT NULL,
+            ki_cost INT UNSIGNED NOT NULL DEFAULT 0,
+            premium_expires_at DATETIME NULL,
             created_at DATETIME NULL,
             updated_at DATETIME NULL,
             CONSTRAINT fk_chapters_manga FOREIGN KEY (manga_id) REFERENCES mangas(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS ki_transactions (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            amount INT NOT NULL,
+            type VARCHAR(64) NOT NULL,
+            description VARCHAR(255) NULL,
+            context LONGTEXT NULL,
+            created_at DATETIME NOT NULL,
+            CONSTRAINT fk_ki_transactions_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS market_offers (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(191) NOT NULL,
+            ki_amount INT UNSIGNED NOT NULL,
+            price DECIMAL(10,2) NOT NULL DEFAULT 0,
+            currency VARCHAR(16) NOT NULL DEFAULT "TRY",
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_unlocks (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            chapter_id INT UNSIGNED NOT NULL,
+            spent_ki INT UNSIGNED NOT NULL,
+            unlocked_at DATETIME NOT NULL,
+            expires_at DATETIME NULL,
+            UNIQUE KEY uniq_unlock (user_id, chapter_id),
+            CONSTRAINT fk_unlock_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            CONSTRAINT fk_unlock_chapter FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS comments (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            manga_id INT UNSIGNED NULL,
+            chapter_id INT UNSIGNED NULL,
+            body LONGTEXT NOT NULL,
+            is_deleted TINYINT(1) NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            CONSTRAINT fk_comment_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            CONSTRAINT fk_comment_manga FOREIGN KEY (manga_id) REFERENCES mangas(id) ON DELETE SET NULL,
+            CONSTRAINT fk_comment_chapter FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS comment_reactions (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            comment_id INT UNSIGNED NOT NULL,
+            user_id INT UNSIGNED NOT NULL,
+            reaction_type VARCHAR(32) NOT NULL,
+            created_at DATETIME NOT NULL,
+            UNIQUE KEY uniq_comment_reaction (comment_id, user_id),
+            CONSTRAINT fk_reaction_comment FOREIGN KEY (comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+            CONSTRAINT fk_reaction_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS chat_messages (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            message TEXT NOT NULL,
+            created_at DATETIME NOT NULL,
+            CONSTRAINT fk_chat_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS settings (
@@ -197,6 +268,10 @@ class Database
             updated_at DATETIME NOT NULL,
             CONSTRAINT fk_menu_items_menu FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        self::ensureColumn($pdo, 'mysql', 'users', 'ki_balance', 'BIGINT NOT NULL DEFAULT 0');
+        self::ensureColumn($pdo, 'mysql', 'chapters', 'ki_cost', 'INT UNSIGNED NOT NULL DEFAULT 0');
+        self::ensureColumn($pdo, 'mysql', 'chapters', 'premium_expires_at', 'DATETIME NULL');
     }
 
     private static function bootstrapSqlite(PDO $pdo): void
@@ -211,6 +286,7 @@ class Database
             avatar_url TEXT,
             website_url TEXT,
             is_active INTEGER NOT NULL DEFAULT 1,
+            ki_balance INTEGER NOT NULL DEFAULT 0,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )');
@@ -236,9 +312,78 @@ class Database
             title TEXT,
             content TEXT,
             assets TEXT,
+            ki_cost INTEGER NOT NULL DEFAULT 0,
+            premium_expires_at TEXT,
             created_at TEXT,
             updated_at TEXT,
             FOREIGN KEY(manga_id) REFERENCES mangas(id) ON DELETE CASCADE
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS ki_transactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            amount INTEGER NOT NULL,
+            type TEXT NOT NULL,
+            description TEXT,
+            context TEXT,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS market_offers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            ki_amount INTEGER NOT NULL,
+            price REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT "TRY",
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_unlocks (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            chapter_id INTEGER NOT NULL,
+            spent_ki INTEGER NOT NULL,
+            unlocked_at TEXT NOT NULL,
+            expires_at TEXT,
+            UNIQUE(user_id, chapter_id),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            manga_id INTEGER,
+            chapter_id INTEGER,
+            body TEXT NOT NULL,
+            is_deleted INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(manga_id) REFERENCES mangas(id) ON DELETE SET NULL,
+            FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE SET NULL
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS comment_reactions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            comment_id INTEGER NOT NULL,
+            user_id INTEGER NOT NULL,
+            reaction_type TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(comment_id, user_id),
+            FOREIGN KEY(comment_id) REFERENCES comments(id) ON DELETE CASCADE,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS chat_messages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            message TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
         )');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS settings (
@@ -274,6 +419,10 @@ class Database
             updated_at TEXT NOT NULL,
             FOREIGN KEY(menu_id) REFERENCES menus(id) ON DELETE CASCADE
         )');
+
+        self::ensureColumn($pdo, 'sqlite', 'users', 'ki_balance', 'INTEGER NOT NULL DEFAULT 0');
+        self::ensureColumn($pdo, 'sqlite', 'chapters', 'ki_cost', 'INTEGER NOT NULL DEFAULT 0');
+        self::ensureColumn($pdo, 'sqlite', 'chapters', 'premium_expires_at', 'TEXT');
     }
 
     private static function seedDefaults(PDO $pdo, array $config, string $driver): void
@@ -320,6 +469,13 @@ class Database
             'ad_footer' => '',
             'analytics_google' => '',
             'analytics_search_console' => '',
+            'ki_currency_name' => 'Ki',
+            'ki_comment_reward' => '5',
+            'ki_reaction_reward' => '1',
+            'ki_chat_reward_per_minute' => '1',
+            'ki_read_reward_per_minute' => '2',
+            'ki_market_enabled' => '1',
+            'ki_unlock_default_duration' => '168',
         ];
 
         foreach ($settings as $key => $value) {
@@ -412,6 +568,46 @@ class Database
                 }
             }
         }
+    }
+
+    private static function ensureColumn(PDO $pdo, string $driver, string $table, string $column, string $definition): void
+    {
+        if (!self::columnExists($pdo, $driver, $table, $column)) {
+            $table = self::assertIdentifier($table);
+            $column = self::assertIdentifier($column);
+            $sql = sprintf('ALTER TABLE %s ADD COLUMN %s %s', $table, $column, $definition);
+            $pdo->exec($sql);
+        }
+    }
+
+    private static function columnExists(PDO $pdo, string $driver, string $table, string $column): bool
+    {
+        $table = self::assertIdentifier($table);
+
+        if ($driver === 'mysql') {
+            $stmt = $pdo->prepare(sprintf('SHOW COLUMNS FROM `%s` LIKE :column', $table));
+            $stmt->execute([':column' => $column]);
+            return $stmt->fetchColumn() !== false;
+        }
+
+        $stmt = $pdo->prepare(sprintf('PRAGMA table_info(`%s`)', $table));
+        $stmt->execute();
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if (($row['name'] ?? null) === $column) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function assertIdentifier(string $identifier): string
+    {
+        if (!preg_match('/^[A-Za-z0-9_]+$/', $identifier)) {
+            throw new InvalidArgumentException('Geçersiz tablo veya sütun adı: ' . $identifier);
+        }
+
+        return $identifier;
     }
 
     private static function upsertSetting(PDO $pdo, string $driver, string $key, string $value): void
