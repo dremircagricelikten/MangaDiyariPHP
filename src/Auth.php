@@ -26,6 +26,7 @@ class Auth
             'email' => $user['email'],
             'role' => $user['role'],
             'avatar_url' => $user['avatar_url'] ?? null,
+            'ki_balance' => isset($user['ki_balance']) ? (int) $user['ki_balance'] : 0,
         ];
     }
 

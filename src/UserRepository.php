@@ -42,7 +42,7 @@ class UserRepository
 
         $now = new DateTimeImmutable();
 
-        $stmt = $this->pdo->prepare('INSERT INTO users (username, email, password_hash, role, bio, avatar_url, website_url, is_active, created_at, updated_at) VALUES (:username, :email, :password, :role, :bio, :avatar, :website, :is_active, :created, :updated)');
+        $stmt = $this->pdo->prepare('INSERT INTO users (username, email, password_hash, role, bio, avatar_url, website_url, is_active, ki_balance, created_at, updated_at) VALUES (:username, :email, :password, :role, :bio, :avatar, :website, :is_active, :ki_balance, :created, :updated)');
 
         $passwordHash = password_hash($password, PASSWORD_DEFAULT);
 
@@ -58,6 +58,7 @@ class UserRepository
                 ':is_active' => $isActive ? 1 : 0,
                 ':created' => $now->format('Y-m-d H:i:s'),
                 ':updated' => $now->format('Y-m-d H:i:s'),
+                ':ki_balance' => (int) ($data['ki_balance'] ?? 0),
             ]);
         } catch (PDOException $exception) {
             throw new InvalidArgumentException('Kullanıcı oluşturulamadı: ' . $exception->getMessage(), previous: $exception);
@@ -75,7 +76,7 @@ class UserRepository
 
     public function findById(int $id): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, created_at, updated_at FROM users WHERE id = :id LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, ki_balance, created_at, updated_at FROM users WHERE id = :id LIMIT 1');
         $stmt->execute([':id' => $id]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -84,7 +85,7 @@ class UserRepository
 
     public function findByEmail(string $email): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, created_at, updated_at FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, ki_balance, created_at, updated_at FROM users WHERE LOWER(email) = LOWER(:email) LIMIT 1');
         $stmt->execute([':email' => $email]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -93,7 +94,7 @@ class UserRepository
 
     public function findByUsername(string $username): ?array
     {
-        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, created_at, updated_at FROM users WHERE username = :username LIMIT 1');
+        $stmt = $this->pdo->prepare('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, password_hash, ki_balance, created_at, updated_at FROM users WHERE username = :username LIMIT 1');
         $stmt->execute([':username' => $username]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
@@ -119,7 +120,7 @@ class UserRepository
 
     public function all(): array
     {
-        $stmt = $this->pdo->query('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, created_at, updated_at FROM users ORDER BY created_at DESC');
+        $stmt = $this->pdo->query('SELECT id, username, email, role, bio, avatar_url, website_url, is_active, ki_balance, created_at, updated_at FROM users ORDER BY created_at DESC');
 
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }

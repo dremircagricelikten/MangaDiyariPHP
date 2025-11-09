@@ -19,8 +19,8 @@ class ChapterRepository
         $now = (new DateTimeImmutable())->format('Y-m-d H:i:s');
         $assets = $data['assets'] ?? [];
 
-        $stmt = $this->db->prepare('INSERT INTO chapters (manga_id, number, title, content, assets, created_at, updated_at)
-            VALUES (:manga_id, :number, :title, :content, :assets, :created_at, :updated_at)');
+        $stmt = $this->db->prepare('INSERT INTO chapters (manga_id, number, title, content, assets, ki_cost, premium_expires_at, created_at, updated_at)
+            VALUES (:manga_id, :number, :title, :content, :assets, :ki_cost, :premium_expires_at, :created_at, :updated_at)');
 
         $stmt->execute([
             ':manga_id' => $mangaId,
@@ -28,6 +28,8 @@ class ChapterRepository
             ':title' => $data['title'] ?? '',
             ':content' => $data['content'] ?? '',
             ':assets' => json_encode($assets, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ':ki_cost' => (int) ($data['ki_cost'] ?? 0),
+            ':premium_expires_at' => $data['premium_expires_at'] ?? null,
             ':created_at' => $now,
             ':updated_at' => $now,
         ]);
@@ -42,13 +44,15 @@ class ChapterRepository
             return null;
         }
 
-        $stmt = $this->db->prepare('UPDATE chapters SET title = :title, content = :content, number = :number, assets = :assets, updated_at = :updated_at WHERE id = :id');
+        $stmt = $this->db->prepare('UPDATE chapters SET title = :title, content = :content, number = :number, assets = :assets, ki_cost = :ki_cost, premium_expires_at = :premium_expires_at, updated_at = :updated_at WHERE id = :id');
         $stmt->execute([
             ':id' => $id,
             ':title' => $data['title'] ?? $existing['title'],
             ':content' => $data['content'] ?? $existing['content'],
             ':number' => $data['number'] ?? $existing['number'],
             ':assets' => json_encode($data['assets'] ?? $existing['assets'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+            ':ki_cost' => isset($data['ki_cost']) ? (int) $data['ki_cost'] : (int) ($existing['ki_cost'] ?? 0),
+            ':premium_expires_at' => $data['premium_expires_at'] ?? ($existing['premium_expires_at'] ?? null),
             ':updated_at' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
 
@@ -152,6 +156,8 @@ class ChapterRepository
         $row['id'] = (int) $row['id'];
         $row['manga_id'] = (int) $row['manga_id'];
         $row['assets'] = $row['assets'] ? json_decode($row['assets'], true) ?: [] : [];
+        $row['ki_cost'] = isset($row['ki_cost']) ? (int) $row['ki_cost'] : 0;
+        $row['premium_expires_at'] = $row['premium_expires_at'] ?? null;
 
         return $row;
     }
