@@ -51,16 +51,24 @@ $kiSettings = [
     'currency_name' => $allSettings['ki_currency_name'] ?? 'Ki',
 ];
 
+$activeWidgetList = $widgetRepo->getActive();
 $activeWidgets = [];
-foreach ($widgetRepo->getActive() as $widget) {
+$widgetsByArea = [
+    'hero' => [],
+    'main' => [],
+    'sidebar' => [],
+];
+foreach ($activeWidgetList as $widget) {
     $activeWidgets[$widget['type']] = $widget;
+    $area = $widget['area'] ?? 'main';
+    if (!isset($widgetsByArea[$area])) {
+        $widgetsByArea[$area] = [];
+    }
+    $widgetsByArea[$area][] = $widget;
 }
 
 $popularWidget = $activeWidgets['popular_slider'] ?? null;
 $latestWidget = $activeWidgets['latest_updates'] ?? null;
-
-$primaryMenuItems = $menus['primary']['items'] ?? [];
-$footerMenuItems = $menus['footer']['items'] ?? [];
 
 $siteStats = [
     'manga_total' => $mangaRepo->count(),
@@ -94,8 +102,8 @@ $siteStats = [
       }
     </style>
   </head>
-  <body class="site-body">
-    <nav class="navbar navbar-expand-lg navbar-dark site-navbar shadow-sm">
+  <body class="site-body" data-theme="dark">
+    <nav class="navbar navbar-expand-lg site-navbar shadow-sm">
       <div class="container-xxl">
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
           <?php if (!empty($site['logo'])): ?>
@@ -103,34 +111,50 @@ $siteStats = [
           <?php endif; ?>
           <span><?= htmlspecialchars($site['name']) ?></span>
         </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarContent">
-          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
-            <?php if (!empty($primaryMenuItems)): ?>
-              <?php foreach ($primaryMenuItems as $item): ?>
+        <div class="d-flex align-items-center gap-2 order-lg-3">
+          <button class="btn btn-outline-light btn-sm btn-theme-toggle" type="button" id="theme-toggle" aria-label="Temayı değiştir">
+            <i class="bi bi-moon-stars"></i>
+          </button>
+          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
+            <span class="navbar-toggler-icon"></span>
+          </button>
+        </div>
+        <div class="collapse navbar-collapse order-lg-2" id="navbarContent">
+          <ul class="navbar-nav me-lg-auto mb-3 mb-lg-0 align-items-lg-center gap-lg-1">
+            <?php if (!empty($menus['primary']['items'])): ?>
+              <?php foreach ($menus['primary']['items'] as $item): ?>
                 <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
               <?php endforeach; ?>
             <?php else: ?>
               <li class="nav-item"><a class="nav-link" href="/">Anasayfa</a></li>
             <?php endif; ?>
+          </ul>
+          <ul class="navbar-nav ms-lg-3 mb-3 mb-lg-0 align-items-lg-center gap-lg-1">
             <?php if ($user): ?>
               <li class="nav-item"><span class="nav-link">Bakiye: <strong id="nav-ki-balance"><?= (int) ($user['ki_balance'] ?? 0) ?></strong> <?= htmlspecialchars($kiSettings['currency_name']) ?></span></li>
-            <?php endif; ?>
-            <?php if ($user && in_array($user['role'], ['admin', 'editor'], true)): ?>
-              <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
-            <?php endif; ?>
-            <?php if ($user): ?>
               <?php $memberProfileUrl = 'member.php?u=' . urlencode($user['username']); ?>
               <li class="nav-item"><a class="nav-link" href="profile.php">Profilim</a></li>
               <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($memberProfileUrl) ?>">Kamu Profili</a></li>
+              <?php if (in_array($user['role'], ['admin', 'editor'], true)): ?>
+                <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
+              <?php endif; ?>
               <li class="nav-item"><a class="nav-link" href="logout.php">Çıkış Yap</a></li>
             <?php else: ?>
               <li class="nav-item"><a class="nav-link" href="login.php">Giriş Yap</a></li>
               <li class="nav-item"><a class="nav-link" href="register.php">Kayıt Ol</a></li>
             <?php endif; ?>
           </ul>
+          <form id="search-form" class="navbar-search d-lg-flex align-items-center gap-2 ms-lg-4" role="search">
+            <span class="search-icon"><i class="bi bi-search"></i></span>
+            <input type="search" id="search" class="form-control" placeholder="Manga ara...">
+            <select id="status" class="form-select">
+              <option value="">Durum: Tümü</option>
+              <option value="ongoing">Devam Ediyor</option>
+              <option value="completed">Tamamlandı</option>
+              <option value="hiatus">Ara Verildi</option>
+            </select>
+            <button class="btn btn-primary" type="submit">Ara</button>
+          </form>
         </div>
       </div>
     </nav>
@@ -152,27 +176,6 @@ $siteStats = [
             <span class="eyebrow">Topluluk Mangaları</span>
             <h1 class="display-5 fw-bold mb-3"><?= htmlspecialchars($site['tagline']) ?></h1>
             <p class="lead text-secondary">Yeni seriler keşfedin, favorilerinizi takip edin ve toplulukla beraber anında yeni bölümlerden haberdar olun.</p>
-            <form id="search-form" class="landing-search mt-4">
-              <div class="row g-2">
-                <div class="col-lg-6">
-                  <label class="form-label" for="search">Seri Ara</label>
-                  <input type="search" id="search" class="form-control form-control-lg" placeholder="Manga ara...">
-                </div>
-                <div class="col-lg-4">
-                  <label class="form-label" for="status">Durum</label>
-                  <select id="status" class="form-select form-select-lg">
-                    <option value="">Tüm Seriler</option>
-                    <option value="ongoing">Devam Ediyor</option>
-                    <option value="completed">Tamamlandı</option>
-                    <option value="hiatus">Ara Verildi</option>
-                  </select>
-                </div>
-                <div class="col-lg-2 d-grid">
-                  <label class="form-label opacity-0">Ara</label>
-                  <button class="btn btn-primary btn-lg" type="submit">Ara</button>
-                </div>
-              </div>
-            </form>
             <div class="hero-stats mt-4">
               <div class="hero-stat">
                 <span class="hero-stat__label">Seri</span>
@@ -193,34 +196,41 @@ $siteStats = [
             </div>
           </div>
           <div class="col-xl-7">
-            <div class="hero-showcase">
-              <div id="featured-highlight" class="feature-highlight"></div>
-              <?php if ($popularWidget): ?>
-              <div class="feature-controls d-flex flex-wrap gap-3 align-items-end">
-                <div>
-                  <label for="popular-sort" class="form-label small text-uppercase">Sıralama</label>
-                  <select id="popular-sort" class="form-select">
-                    <option value="random">Rastgele</option>
-                    <option value="newest">En Yeni</option>
-                    <option value="updated">Son Güncellenen</option>
-                    <option value="alphabetical">Alfabetik</option>
-                  </select>
-                </div>
-                <div>
-                  <label for="popular-status" class="form-label small text-uppercase">Durum</label>
-                  <select id="popular-status" class="form-select">
-                    <option value="">Tümü</option>
-                    <option value="ongoing">Devam Ediyor</option>
-                    <option value="completed">Tamamlandı</option>
-                    <option value="hiatus">Ara Verildi</option>
-                  </select>
-                </div>
-              </div>
-              <div id="featured-rail" class="featured-rail mt-3"></div>
-              <?php else: ?>
-              <div class="feature-placeholder">Popüler widget etkin değil. Yönetim panelinden ana sayfa bileşenlerini düzenleyebilirsiniz.</div>
-              <?php endif; ?>
-            </div>
+            <?php $heroWidgets = $widgetsByArea['hero'] ?? []; ?>
+            <?php if (!empty($heroWidgets)): ?>
+              <?php foreach ($heroWidgets as $widget): ?>
+                <?php if ($widget['type'] === 'popular_slider'): ?>
+                  <div class="hero-showcase">
+                    <div id="featured-highlight" class="feature-highlight"></div>
+                    <div class="feature-controls">
+                      <div>
+                        <label for="popular-sort" class="form-label small text-uppercase">Sıralama</label>
+                        <select id="popular-sort" class="form-select">
+                          <option value="random">Rastgele</option>
+                          <option value="newest">En Yeni</option>
+                          <option value="updated">Son Güncellenen</option>
+                          <option value="alphabetical">Alfabetik</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="popular-status" class="form-label small text-uppercase">Durum</label>
+                        <select id="popular-status" class="form-select">
+                          <option value="">Tümü</option>
+                          <option value="ongoing">Devam Ediyor</option>
+                          <option value="completed">Tamamlandı</option>
+                          <option value="hiatus">Ara Verildi</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div id="featured-rail" class="featured-rail mt-3"></div>
+                  </div>
+                <?php else: ?>
+                  <div class="feature-placeholder">Yeni hero widget türü yakında desteklenecek.</div>
+                <?php endif; ?>
+              <?php endforeach; ?>
+            <?php else: ?>
+              <div class="feature-placeholder">Ana vitrin bileşeni henüz etkin değil.</div>
+            <?php endif; ?>
           </div>
         </div>
       </div>
@@ -228,40 +238,61 @@ $siteStats = [
 
     <main class="landing-main py-5">
       <div class="container-xxl">
-        <div class="row g-4">
-          <div class="<?= !empty($ads['sidebar']) ? 'col-xxl-9' : 'col-12' ?>">
-            <?php if ($latestWidget): ?>
-            <section id="latest-updates" class="landing-section">
-              <div class="section-header">
-                <div>
-                  <span class="eyebrow">Anlık Güncellemeler</span>
-                  <h2><?= htmlspecialchars($latestWidget['title']) ?></h2>
-                  <p class="text-secondary">Yeni yüklenen bölümleri yakalayın.</p>
-                </div>
-                <div class="widget-controls d-flex gap-3 flex-wrap">
-                  <div>
-                    <label for="latest-sort" class="form-label small text-uppercase">Sıralama</label>
-                    <select id="latest-sort" class="form-select form-select-sm">
-                      <option value="newest">En Yeni</option>
-                      <option value="oldest">En Eski</option>
-                      <option value="chapter_desc">Bölüm No (Azalan)</option>
-                      <option value="chapter_asc">Bölüm No (Artan)</option>
-                    </select>
+        <div class="layout-grid">
+          <div class="layout-main">
+            <?php $mainWidgets = $widgetsByArea['main'] ?? []; ?>
+            <?php foreach ($mainWidgets as $widget): ?>
+              <?php if ($widget['type'] === 'latest_updates'): ?>
+                <section class="landing-section" data-widget="latest">
+                  <div class="section-header">
+                    <div>
+                      <span class="eyebrow">Anlık Güncellemeler</span>
+                      <h2><?= htmlspecialchars($widget['title']) ?></h2>
+                      <p class="text-secondary">Yeni yüklenen bölümleri yakalayın.</p>
+                    </div>
+                    <div class="widget-controls d-flex gap-3 flex-wrap">
+                      <div>
+                        <label for="latest-sort" class="form-label small text-uppercase">Sıralama</label>
+                        <select id="latest-sort" class="form-select form-select-sm">
+                          <option value="newest">En Yeni</option>
+                          <option value="oldest">En Eski</option>
+                          <option value="chapter_desc">Bölüm No (Azalan)</option>
+                          <option value="chapter_asc">Bölüm No (Artan)</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label for="latest-status" class="form-label small text-uppercase">Durum</label>
+                        <select id="latest-status" class="form-select form-select-sm">
+                          <option value="">Tümü</option>
+                          <option value="ongoing">Devam Ediyor</option>
+                          <option value="completed">Tamamlandı</option>
+                          <option value="hiatus">Ara Verildi</option>
+                        </select>
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <label for="latest-status" class="form-label small text-uppercase">Durum</label>
-                    <select id="latest-status" class="form-select form-select-sm">
-                      <option value="">Tümü</option>
-                      <option value="ongoing">Devam Ediyor</option>
-                      <option value="completed">Tamamlandı</option>
-                      <option value="hiatus">Ara Verildi</option>
-                    </select>
+                  <div class="row g-4" id="latest-list"></div>
+                </section>
+              <?php elseif ($widget['type'] === 'popular_slider'): ?>
+                <section class="landing-section" data-widget="popular-grid">
+                  <div class="section-header">
+                    <div>
+                      <span class="eyebrow">Trend</span>
+                      <h2><?= htmlspecialchars($widget['title']) ?></h2>
+                      <p class="text-secondary">Topluluğun favori serileri.</p>
+                    </div>
                   </div>
-                </div>
-              </div>
-              <div class="row g-4" id="latest-list"></div>
-            </section>
-            <?php endif; ?>
+                  <div class="row g-4" id="featured-grid"></div>
+                </section>
+              <?php else: ?>
+                <section class="landing-section">
+                  <div class="section-header">
+                    <h2><?= htmlspecialchars($widget['title']) ?></h2>
+                    <p class="text-secondary">Bu widget türü henüz özelleştirilmedi.</p>
+                  </div>
+                </section>
+              <?php endif; ?>
+            <?php endforeach; ?>
 
             <section id="discover" class="landing-section">
               <div class="section-header">
@@ -273,27 +304,40 @@ $siteStats = [
               </div>
               <div class="row g-4" id="manga-list"></div>
             </section>
-
-            <?php if ($popularWidget): ?>
-            <section id="populer" class="landing-section">
-              <div class="section-header">
-                <div>
-                  <span class="eyebrow">Trend</span>
-                  <h2><?= htmlspecialchars($popularWidget['title']) ?></h2>
-                  <p class="text-secondary">Topluluğun favori serileri.</p>
-                </div>
-              </div>
-              <div class="row g-4" id="featured-grid"></div>
-            </section>
-            <?php endif; ?>
           </div>
-          <?php if (!empty($ads['sidebar'])): ?>
-            <aside class="col-xxl-3">
-              <div class="ad-slot ad-slot--sidebar sticky-lg-top">
+          <aside class="layout-sidebar">
+            <?php if (!empty($ads['sidebar'])): ?>
+              <div class="ad-slot ad-slot--sidebar sticky-lg-top mb-4">
                 <?= $ads['sidebar'] ?>
               </div>
-            </aside>
-          <?php endif; ?>
+            <?php endif; ?>
+
+            <?php $sidebarWidgets = $widgetsByArea['sidebar'] ?? []; ?>
+            <?php foreach ($sidebarWidgets as $widget): ?>
+              <?php if ($widget['type'] === 'popular_slider'): ?>
+                <div class="sidebar-widget">
+                  <div class="sidebar-widget__header">
+                    <h3><?= htmlspecialchars($widget['title']) ?></h3>
+                  </div>
+                  <div id="featured-sidebar" class="sidebar-list"></div>
+                </div>
+              <?php elseif ($widget['type'] === 'latest_updates'): ?>
+                <div class="sidebar-widget">
+                  <div class="sidebar-widget__header">
+                    <h3><?= htmlspecialchars($widget['title']) ?></h3>
+                  </div>
+                  <div id="latest-sidebar" class="sidebar-list"></div>
+                </div>
+              <?php else: ?>
+                <div class="sidebar-widget">
+                  <div class="sidebar-widget__header">
+                    <h3><?= htmlspecialchars($widget['title']) ?></h3>
+                  </div>
+                  <p class="small text-secondary mb-0">Bu widget türü henüz yan panelde desteklenmiyor.</p>
+                </div>
+              <?php endif; ?>
+            <?php endforeach; ?>
+          </aside>
         </div>
       </div>
     </main>
@@ -322,9 +366,9 @@ $siteStats = [
     <footer class="site-footer py-4">
       <div class="container-xxl d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
         <small>© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>. Tüm hakları saklıdır.</small>
-        <?php if (!empty($footerMenuItems)): ?>
+        <?php if (!empty($menus['footer']['items'])): ?>
           <ul class="nav footer-menu">
-            <?php foreach ($footerMenuItems as $item): ?>
+            <?php foreach ($menus['footer']['items'] as $item): ?>
               <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
             <?php endforeach; ?>
           </ul>

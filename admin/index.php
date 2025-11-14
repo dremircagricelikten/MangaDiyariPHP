@@ -73,20 +73,58 @@ $dashboardStats = [
             <div class="text-muted small">Rol: <?= htmlspecialchars($user['role']) ?></div>
           </div>
         </div>
-        <nav class="sidebar-nav">
-          <div class="sidebar-nav-group">
-            <span class="sidebar-nav-title">Genel</span>
-            <a class="sidebar-link" href="#dashboard"><i class="bi bi-speedometer2"></i> Kontrol Paneli</a>
-            <a class="sidebar-link" href="#content-management"><i class="bi bi-journal-plus"></i> İçerik</a>
-            <a class="sidebar-link" href="#appearance"><i class="bi bi-palette"></i> Görünüm</a>
-            <a class="sidebar-link" href="#homepage"><i class="bi bi-grid"></i> Ana Sayfa</a>
-          </div>
-          <div class="sidebar-nav-group">
-            <span class="sidebar-nav-title">Site</span>
-            <a class="sidebar-link" href="#menus"><i class="bi bi-menu-button-wide"></i> Menüler</a>
-            <a class="sidebar-link" href="#community"><i class="bi bi-people"></i> Topluluk</a>
-            <a class="sidebar-link" href="#integrations"><i class="bi bi-plug"></i> Entegrasyonlar</a>
-          </div>
+        <nav class="sidebar-nav wp-menu">
+          <ul class="menu-block">
+            <li class="menu-heading">Başlangıç</li>
+            <li>
+              <a class="menu-link is-active" href="#dashboard" data-section="dashboard">
+                <i class="bi bi-speedometer2"></i>
+                <span>Giriş</span>
+              </a>
+            </li>
+          </ul>
+          <ul class="menu-block">
+            <li class="menu-heading">İçerik</li>
+            <li>
+              <button class="menu-parent" type="button" data-target="menu-manga">
+                <span><i class="bi bi-book-half"></i> Manga</span>
+                <i class="bi bi-chevron-down"></i>
+              </button>
+              <ul class="menu-sub" id="menu-manga">
+                <li><a class="menu-link" href="#content-management" data-section="manga" data-anchor="#manga-form">Yeni Manga Ekle</a></li>
+                <li><a class="menu-link" href="#content-management" data-section="manga" data-anchor="#chapter-form">Yeni Bölüm Ekle</a></li>
+                <li><a class="menu-link" href="#homepage" data-section="widgets">Ana Sayfa Widgetları</a></li>
+              </ul>
+            </li>
+            <li>
+              <a class="menu-link" href="#pages" data-section="pages">
+                <i class="bi bi-file-earmark-text"></i>
+                <span>Sayfalar</span>
+              </a>
+            </li>
+          </ul>
+          <ul class="menu-block">
+            <li class="menu-heading">Görünüm</li>
+            <li>
+              <button class="menu-parent" type="button" data-target="menu-appearance">
+                <span><i class="bi bi-palette"></i> Tema</span>
+                <i class="bi bi-chevron-down"></i>
+              </button>
+              <ul class="menu-sub" id="menu-appearance">
+                <li><a class="menu-link" href="#appearance" data-section="appearance">Tema Ayarları</a></li>
+                <li><a class="menu-link" href="#homepage" data-section="widgets">Widgetlar</a></li>
+                <li><a class="menu-link" href="#menus" data-section="menus">Menüler</a></li>
+              </ul>
+            </li>
+          </ul>
+          <ul class="menu-block">
+            <li class="menu-heading">Topluluk</li>
+            <li><a class="menu-link" href="#community" data-section="community"><i class="bi bi-people"></i><span>Üyeler &amp; Reklam</span></a></li>
+          </ul>
+          <ul class="menu-block">
+            <li class="menu-heading">Ayarlar</li>
+            <li><a class="menu-link" href="#integrations" data-section="integrations"><i class="bi bi-plug"></i><span>Entegrasyonlar</span></a></li>
+          </ul>
         </nav>
         <div class="sidebar-footer d-flex flex-column gap-2">
           <a href="../public/index.php" class="btn btn-outline-light btn-sm w-100"><i class="bi bi-box-arrow-up-right me-1"></i> Siteyi Görüntüle</a>
@@ -100,12 +138,12 @@ $dashboardStats = [
             <h1 class="h3 mb-0">Yönetim Paneli</h1>
           </div>
           <div class="d-flex flex-wrap gap-2">
-            <a class="btn btn-outline-light btn-sm" href="#menus"><i class="bi bi-menu-app me-1"></i> Menüler</a>
-            <a class="btn btn-primary btn-sm" href="#content-management"><i class="bi bi-plus-circle me-1"></i> Yeni İçerik</a>
+            <a class="btn btn-outline-light btn-sm js-section-link" href="#menus" data-section="menus"><i class="bi bi-menu-app me-1"></i> Menüler</a>
+            <a class="btn btn-primary btn-sm js-section-link" href="#content-management" data-section="manga" data-anchor="#manga-form"><i class="bi bi-plus-circle me-1"></i> Yeni İçerik</a>
           </div>
         </header>
         <main class="admin-main">
-          <section id="dashboard" class="admin-section">
+          <section id="dashboard" class="admin-section is-active" data-section="dashboard">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Özet</span>
@@ -139,38 +177,21 @@ $dashboardStats = [
                 <div class="dashboard-card-meta">Topluluk etkileşimini artırmak için ödül sistemini kullanın.</div>
               </div>
             </div>
-            <div class="row g-4 mt-2">
-              <div class="col-xl-7">
-                <div class="card admin-card h-100">
-                  <div class="card-body">
-                    <h3 class="card-title h5">Hızlı İşlemler</h3>
-                    <p class="text-muted small">Sık kullanılan alanlara tek dokunuşla ulaşın.</p>
-                    <div class="quick-actions">
-                      <a href="#content-management" class="quick-action"><i class="bi bi-plus-circle"></i><span>Yeni Seri Ekle</span></a>
-                      <a href="#homepage" class="quick-action"><i class="bi bi-sliders"></i><span>Ana Sayfa Widgetları</span></a>
-                      <a href="#community" class="quick-action"><i class="bi bi-people"></i><span>Üyeleri Yönet</span></a>
-                      <a href="#integrations" class="quick-action"><i class="bi bi-graph-up"></i><span>Analitik Kodları</span></a>
-                    </div>
+            <div class="card admin-card mt-4">
+              <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+                  <div>
+                    <h3 class="card-title h5 mb-0">Son Yorumlar</h3>
+                    <p class="text-muted small mb-0">Topluluktan gelen en yeni yorumları hızlıca kontrol edin.</p>
                   </div>
+                  <button type="button" class="btn btn-outline-light btn-sm" id="refresh-comments"><i class="bi bi-arrow-clockwise me-1"></i>Yenile</button>
                 </div>
-              </div>
-              <div class="col-xl-5">
-                <div class="card admin-card h-100">
-                  <div class="card-body">
-                    <h3 class="card-title h5">Site Durumu</h3>
-                    <ul class="status-list">
-                      <li><span>Site Adı</span><strong><?= htmlspecialchars($site['name']) ?></strong></li>
-                      <li><span>Slogan</span><strong><?= htmlspecialchars($site['tagline']) ?></strong></li>
-                      <li><span>Varsayılan Rol</span><strong>Üye</strong></li>
-                      <li><span>Son Giriş</span><strong><?= date('d.m.Y H:i') ?></strong></li>
-                    </ul>
-                  </div>
-                </div>
+                <div id="dashboard-comments" class="comment-feed"></div>
               </div>
             </div>
           </section>
 
-          <section id="content-management" class="admin-section">
+          <section id="content-management" class="admin-section" data-section="manga">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Üretim</span>
@@ -278,7 +299,93 @@ $dashboardStats = [
             </div>
           </section>
 
-          <section id="appearance" class="admin-section">
+          <section id="pages" class="admin-section" data-section="pages">
+            <div class="admin-section-header">
+              <div>
+                <span class="eyebrow">Statik İçerik</span>
+                <h2>Sayfa Yönetimi</h2>
+                <p class="text-muted mb-0">WordPress benzeri bir düzenle yeni sayfalar oluşturun veya mevcut sayfaları güncelleyin.</p>
+              </div>
+            </div>
+            <div class="row g-4">
+              <div class="col-xl-5">
+                <div class="card admin-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                      <h3 class="card-title h5 mb-0">Sayfa Detayı</h3>
+                      <button type="button" class="btn btn-outline-light btn-sm d-none" id="page-cancel-edit"><i class="bi bi-x-lg me-1"></i>İptal</button>
+                    </div>
+                    <form id="page-form" class="vstack gap-3">
+                      <input type="hidden" name="id" id="page-id">
+                      <div>
+                        <label class="form-label">Başlık</label>
+                        <input type="text" class="form-control" name="title" id="page-title" required>
+                      </div>
+                      <div>
+                        <label class="form-label">Bağlantı (slug)</label>
+                        <input type="text" class="form-control" name="slug" id="page-slug" placeholder="ornek-sayfa">
+                        <div class="form-text">Sadece küçük harf ve tire kullanın. Boş bırakılırsa otomatik oluşturulur.</div>
+                      </div>
+                      <div>
+                        <label class="form-label">Durum</label>
+                        <select class="form-select" name="status" id="page-status">
+                          <option value="draft">Taslak</option>
+                          <option value="published">Yayında</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label class="form-label">İçerik</label>
+                        <textarea class="form-control" rows="8" name="content" id="page-content" placeholder="Sayfa içeriğini buraya girin..." required></textarea>
+                      </div>
+                      <div class="d-flex justify-content-between align-items-center">
+                        <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-save me-1"></i>Sayfayı Kaydet</button>
+                        <div class="small text-muted" id="page-form-hint">Yeni sayfalar yayınlandığında menülere ekleyebilirsiniz.</div>
+                      </div>
+                      <div id="page-form-message"></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              <div class="col-xl-7">
+                <div class="card admin-card h-100">
+                  <div class="card-body">
+                    <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+                      <div>
+                        <h3 class="card-title h5 mb-0">Kayıtlı Sayfalar</h3>
+                        <p class="text-muted small mb-0">Duruma göre filtreleyebilir veya sayfaları arayabilirsiniz.</p>
+                      </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <select id="page-status-filter" class="form-select form-select-sm">
+                          <option value="">Tümü</option>
+                          <option value="published">Yayında</option>
+                          <option value="draft">Taslak</option>
+                        </select>
+                        <div class="input-group input-group-sm">
+                          <span class="input-group-text"><i class="bi bi-search"></i></span>
+                          <input type="search" id="page-search" class="form-control" placeholder="Sayfa ara">
+                        </div>
+                      </div>
+                    </div>
+                    <div class="table-responsive">
+                      <table class="table table-dark table-hover align-middle" id="page-table">
+                        <thead>
+                          <tr>
+                            <th>Başlık</th>
+                            <th>Durum</th>
+                            <th>Bağlantı</th>
+                            <th class="text-end">İşlemler</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section id="appearance" class="admin-section" data-section="appearance">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Marka</span>
@@ -352,7 +459,7 @@ $dashboardStats = [
             </div>
           </section>
 
-          <section id="homepage" class="admin-section">
+          <section id="homepage" class="admin-section" data-section="widgets">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Bileşenler</span>
@@ -374,7 +481,7 @@ $dashboardStats = [
             </div>
           </section>
 
-          <section id="menus" class="admin-section">
+          <section id="menus" class="admin-section" data-section="menus">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Navigasyon</span>
@@ -397,7 +504,7 @@ $dashboardStats = [
             </div>
           </section>
 
-          <section id="community" class="admin-section">
+          <section id="community" class="admin-section" data-section="community">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Topluluk</span>
@@ -494,7 +601,7 @@ $dashboardStats = [
             </div>
           </section>
 
-          <section id="integrations" class="admin-section">
+          <section id="integrations" class="admin-section" data-section="integrations">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Bağlantılar</span>

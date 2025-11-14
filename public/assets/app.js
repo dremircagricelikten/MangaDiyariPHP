@@ -2,6 +2,39 @@ $(function () {
   const widgets = window.appWidgets || {};
   const popularWidget = widgets.popular_slider || null;
   const latestWidget = widgets.latest_updates || null;
+  const themeStorageKey = 'md-theme-preference';
+
+  const body = $('body');
+  const themeToggle = $('#theme-toggle');
+
+  function applyTheme(theme) {
+    const nextTheme = theme === 'light' ? 'light' : 'dark';
+    body.attr('data-theme', nextTheme);
+    const icon = nextTheme === 'dark' ? 'bi-moon-stars' : 'bi-sun-fill';
+    const label = nextTheme === 'dark' ? 'Açık tema' : 'Koyu tema';
+    themeToggle.attr('aria-label', `Temayı değiştir (${label})`);
+    themeToggle.find('i').attr('class', `bi ${icon}`);
+  }
+
+  function detectInitialTheme() {
+    const stored = localStorage.getItem(themeStorageKey);
+    if (stored === 'light' || stored === 'dark') {
+      return stored;
+    }
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+      return 'light';
+    }
+    return 'dark';
+  }
+
+  applyTheme(detectInitialTheme());
+
+  themeToggle.on('click', function () {
+    const current = body.attr('data-theme') === 'light' ? 'light' : 'dark';
+    const next = current === 'light' ? 'dark' : 'light';
+    localStorage.setItem(themeStorageKey, next);
+    applyTheme(next);
+  });
 
   function truncate(text, length) {
     if (!text) {
@@ -144,6 +177,33 @@ $(function () {
     data.forEach((manga) => container.append(renderMangaCard(manga)));
   }
 
+  function renderFeaturedSidebar(data) {
+    const container = $('#featured-sidebar');
+    if (!container.length) {
+      return;
+    }
+
+    container.empty();
+
+    if (!data.length) {
+      container.append('<div class="empty-state">Popüler seri bulunamadı.</div>');
+      return;
+    }
+
+    data.slice(0, 6).forEach((manga) => {
+      const cover = manga.cover_image || 'https://placehold.co/120x160?text=Manga';
+      const url = `manga.php?slug=${encodeURIComponent(manga.slug)}`;
+      container.append(`
+        <a class="sidebar-item" href="${url}">
+          <span class="sidebar-item__media" style="background-image:url('${cover}')"></span>
+          <span class="sidebar-item__content">
+            <span class="sidebar-item__title">${manga.title}</span>
+            <span class="sidebar-item__meta">${formatStatus(manga.status)}</span>
+          </span>
+        </a>`);
+    });
+  }
+
   function formatDate(value) {
     if (!value) {
       return '';
@@ -196,6 +256,32 @@ $(function () {
     chapters.forEach((chapter) => container.append(renderChapterCard(chapter)));
   }
 
+  function renderLatestSidebar(chapters) {
+    const container = $('#latest-sidebar');
+    if (!container.length) {
+      return;
+    }
+
+    container.empty();
+
+    if (!chapters.length) {
+      container.append('<div class="empty-state">Yeni bölüm bulunamadı.</div>');
+      return;
+    }
+
+    chapters.slice(0, 8).forEach((chapter) => {
+      const url = `chapter.php?slug=${encodeURIComponent(chapter.manga_slug)}&chapter=${encodeURIComponent(chapter.number)}`;
+      container.append(`
+        <a class="sidebar-item" href="${url}">
+          <span class="sidebar-item__content">
+            <span class="sidebar-item__title">${chapter.manga_title}</span>
+            <span class="sidebar-item__meta">Bölüm ${chapter.number}</span>
+          </span>
+          ${chapter.ki_cost > 0 ? '<span class="badge bg-warning text-dark">Premium</span>' : ''}
+        </a>`);
+    });
+  }
+
   function initPopular(widget) {
     const config = widget.config || {};
     const sortSelect = $('#popular-sort');
@@ -212,8 +298,8 @@ $(function () {
       const params = {
         action: 'popular',
         limit: config.limit || 6,
-        sort: sortSelect.val(),
-        status: statusSelect.val(),
+        sort: sortSelect.length ? sortSelect.val() : config.sort || 'random',
+        status: statusSelect.length ? statusSelect.val() : config.status || '',
       };
 
       $.getJSON('api.php', params)
@@ -221,6 +307,7 @@ $(function () {
           renderFeaturedHighlight(data);
           renderFeaturedRail(data);
           renderFeaturedGrid(data);
+          renderFeaturedSidebar(data);
         });
     }
 
@@ -245,13 +332,14 @@ $(function () {
       const params = {
         action: 'latest-chapters',
         limit: config.limit || 8,
-        sort: sortSelect.val(),
-        status: statusSelect.val(),
+        sort: sortSelect.length ? sortSelect.val() : config.sort || 'newest',
+        status: statusSelect.length ? statusSelect.val() : config.status || '',
       };
 
       $.getJSON('api.php', params)
         .done(({ data }) => {
           renderLatestList(data);
+          renderLatestSidebar(data);
         });
     }
 

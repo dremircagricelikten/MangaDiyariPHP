@@ -55,6 +55,44 @@ class InteractionRepository
         }, $comments);
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listRecentComments(int $limit = 10): array
+    {
+        $limit = max(1, $limit);
+        $query = 'SELECT comments.*, users.username, users.avatar_url, mangas.title AS manga_title, mangas.slug AS manga_slug
+            FROM comments
+            INNER JOIN users ON users.id = comments.user_id
+            LEFT JOIN mangas ON mangas.id = comments.manga_id
+            WHERE comments.is_deleted = 0
+            ORDER BY comments.created_at DESC
+            LIMIT :limit';
+
+        $stmt = $this->db->prepare($query);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        if (!$rows) {
+            return [];
+        }
+
+        $commentIds = array_map(static fn(array $row): int => (int) $row['id'], $rows);
+        $reactionMap = $this->getReactionSummary($commentIds);
+
+        return array_map(function (array $row) use ($reactionMap): array {
+            $id = (int) $row['id'];
+            $row['id'] = $id;
+            $row['user_id'] = (int) $row['user_id'];
+            $row['manga_id'] = $row['manga_id'] !== null ? (int) $row['manga_id'] : null;
+            $row['chapter_id'] = $row['chapter_id'] !== null ? (int) $row['chapter_id'] : null;
+            $row['reaction_summary'] = $reactionMap[$id] ?? [];
+
+            return $row;
+        }, $rows);
+    }
+
     public function createComment(int $userId, array $data): array
     {
         $body = trim($data['body'] ?? '');
