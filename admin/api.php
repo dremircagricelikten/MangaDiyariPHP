@@ -74,12 +74,70 @@ try {
                 'description' => trim($_POST['description'] ?? ''),
                 'cover_image' => trim($_POST['cover_image'] ?? ''),
                 'author' => trim($_POST['author'] ?? ''),
+                'artist' => trim($_POST['artist'] ?? ''),
                 'status' => $_POST['status'] ?? 'ongoing',
-                'genres' => trim($_POST['genres'] ?? ''),
+                'genres' => trim($_POST['type'] ?? ($_POST['genres'] ?? '')),
                 'tags' => trim($_POST['tags'] ?? ''),
             ]);
 
             echo json_encode(['message' => 'Seri başarıyla oluşturuldu', 'manga' => $manga]);
+            break;
+        case 'update-manga':
+            $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($id <= 0) {
+                throw new InvalidArgumentException('Geçersiz manga');
+            }
+
+            $payload = [
+                'title' => isset($_POST['title']) ? trim((string) $_POST['title']) : null,
+                'description' => isset($_POST['description']) ? trim((string) $_POST['description']) : null,
+                'cover_image' => isset($_POST['cover_image']) ? trim((string) $_POST['cover_image']) : null,
+                'author' => isset($_POST['author']) ? trim((string) $_POST['author']) : null,
+                'artist' => isset($_POST['artist']) ? trim((string) $_POST['artist']) : null,
+                'status' => isset($_POST['status']) ? (string) $_POST['status'] : null,
+                'genres' => isset($_POST['type']) ? trim((string) $_POST['type']) : (isset($_POST['genres']) ? trim((string) $_POST['genres']) : null),
+                'tags' => isset($_POST['tags']) ? trim((string) $_POST['tags']) : null,
+            ];
+
+            $manga = $mangaRepo->update($id, array_filter($payload, fn($value) => $value !== null));
+            if (!$manga) {
+                throw new InvalidArgumentException('Manga bulunamadı');
+            }
+
+            echo json_encode(['message' => 'Manga güncellendi', 'manga' => $manga]);
+            break;
+        case 'delete-manga':
+            $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($id <= 0) {
+                throw new InvalidArgumentException('Geçersiz manga');
+            }
+
+            $mangaRepo->delete($id);
+            echo json_encode(['message' => 'Manga silindi']);
+            break;
+        case 'list-manga':
+            $search = trim((string) ($_GET['search'] ?? ''));
+            $status = trim((string) ($_GET['status'] ?? ''));
+            $filters = [];
+            if ($search !== '') {
+                $filters['search'] = $search;
+            }
+            if ($status !== '') {
+                $filters['status'] = $status;
+            }
+            $mangas = $mangaRepo->list($filters);
+            echo json_encode(['data' => $mangas]);
+            break;
+        case 'get-manga':
+            $id = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($id <= 0) {
+                throw new InvalidArgumentException('Geçersiz manga');
+            }
+            $manga = $mangaRepo->findById($id);
+            if (!$manga) {
+                throw new InvalidArgumentException('Manga bulunamadı');
+            }
+            echo json_encode(['data' => $manga]);
             break;
         case 'create-chapter':
             $required = ['manga_id', 'number'];
@@ -106,6 +164,9 @@ try {
                 $premiumExpiresAt = (new DateTimeImmutable())->add(new DateInterval('PT' . $premiumDuration . 'H'))->format('Y-m-d H:i:s');
             }
 
+            $storageTarget = $_POST['storage_target'] ?? '';
+            $storageOptions = resolveChapterStorage($settingRepo, $storageTarget);
+
             $preparedAssets = prepareChapterAssets();
 
             $chapter = $chapterRepo->create($mangaId, [
@@ -118,13 +179,125 @@ try {
             ]);
 
             if (!empty($preparedAssets)) {
-                $assets = persistChapterAssets($chapter['id'], $number, $preparedAssets);
+                $assets = persistChapterAssets($chapter['id'], $number, $preparedAssets, $storageOptions);
                 $chapter = $chapterRepo->update($chapter['id'], [
                     'assets' => $assets,
                 ]) ?? $chapter;
             }
 
             echo json_encode(['message' => 'Bölüm başarıyla oluşturuldu', 'chapter' => $chapter]);
+            break;
+        case 'list-chapters':
+            $mangaId = isset($_GET['manga_id']) ? (int) $_GET['manga_id'] : 0;
+            if ($mangaId <= 0) {
+                throw new InvalidArgumentException('Geçersiz manga');
+            }
+            $order = strtolower((string) ($_GET['order'] ?? 'desc')) === 'asc' ? 'asc' : 'desc';
+            $chapters = $chapterRepo->listByManga($mangaId);
+            if ($order === 'asc') {
+                $chapters = array_reverse($chapters);
+            }
+            echo json_encode(['data' => $chapters]);
+            break;
+        case 'get-chapter':
+            $chapterId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($chapterId <= 0) {
+                throw new InvalidArgumentException('Geçersiz bölüm');
+            }
+            $chapter = $chapterRepo->findById($chapterId);
+            if (!$chapter) {
+                throw new InvalidArgumentException('Bölüm bulunamadı');
+            }
+            echo json_encode(['data' => $chapter]);
+            break;
+        case 'update-chapter':
+            $chapterId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($chapterId <= 0) {
+                throw new InvalidArgumentException('Geçersiz bölüm');
+            }
+            $chapter = $chapterRepo->findById($chapterId);
+            if (!$chapter) {
+                throw new InvalidArgumentException('Bölüm bulunamadı');
+            }
+
+            $payload = [
+                'number' => isset($_POST['number']) ? trim((string) $_POST['number']) : null,
+                'title' => isset($_POST['title']) ? trim((string) $_POST['title']) : null,
+                'content' => isset($_POST['content']) ? trim((string) $_POST['content']) : null,
+                'ki_cost' => isset($_POST['ki_cost']) ? max(0, (int) $_POST['ki_cost']) : null,
+                'premium_expires_at' => isset($_POST['premium_expires_at']) && $_POST['premium_expires_at'] !== ''
+                    ? (string) $_POST['premium_expires_at']
+                    : null,
+            ];
+
+            $storageOptions = resolveChapterStorage($settingRepo, $_POST['storage_target'] ?? null);
+            $newAssets = prepareChapterAssets();
+            if (!empty($newAssets)) {
+                $payload['assets'] = persistChapterAssets($chapterId, $payload['number'] ?? $chapter['number'], $newAssets, $storageOptions);
+            }
+
+            $chapter = $chapterRepo->update($chapterId, array_filter($payload, fn($value) => $value !== null)) ?? $chapter;
+            echo json_encode(['message' => 'Bölüm güncellendi', 'chapter' => $chapter]);
+            break;
+        case 'delete-chapter':
+            $chapterId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($chapterId <= 0) {
+                throw new InvalidArgumentException('Geçersiz bölüm');
+            }
+            $chapterRepo->delete($chapterId);
+            echo json_encode(['message' => 'Bölüm silindi']);
+            break;
+        case 'bulk-create-chapters':
+            $mangaId = isset($_POST['manga_id']) ? (int) $_POST['manga_id'] : 0;
+            if ($mangaId <= 0) {
+                throw new InvalidArgumentException('Geçersiz manga');
+            }
+            if (empty($_FILES['chapter_bundle']['tmp_name']) || ($_FILES['chapter_bundle']['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+                throw new InvalidArgumentException('Geçerli bir ZIP dosyası yükleyin.');
+            }
+
+            $kiCost = isset($_POST['ki_cost']) ? max(0, (int) $_POST['ki_cost']) : 0;
+            $duration = isset($_POST['premium_duration_hours']) ? max(0, (int) $_POST['premium_duration_hours']) : null;
+            if ($duration === null && $kiCost > 0) {
+                $defaultDuration = (int) ($settingRepo->get('ki_unlock_default_duration', '0') ?? 0);
+                $duration = $defaultDuration > 0 ? $defaultDuration : null;
+            }
+
+            $premiumExpiresAt = null;
+            if ($kiCost > 0 && $duration) {
+                $premiumExpiresAt = (new DateTimeImmutable())->add(new DateInterval('PT' . $duration . 'H'))->format('Y-m-d H:i:s');
+            }
+
+            $storageOptions = resolveChapterStorage($settingRepo, $_POST['storage_target'] ?? null);
+            $titleTemplate = trim((string) ($_POST['title_template'] ?? ''));
+
+            $bundle = prepareChapterBundle($_FILES['chapter_bundle']['tmp_name']);
+            if (empty($bundle)) {
+                throw new InvalidArgumentException('Zip dosyasında uygun bölüm klasörü bulunamadı.');
+            }
+
+            $created = [];
+            foreach ($bundle as $folder => $assets) {
+                $chapterNumber = $folder;
+                if ($chapterRepo->findByMangaAndNumber($mangaId, $chapterNumber)) {
+                    continue;
+                }
+
+                $chapter = $chapterRepo->create($mangaId, [
+                    'number' => $chapterNumber,
+                    'title' => $titleTemplate !== '' ? str_replace('{{number}}', $chapterNumber, $titleTemplate) : '',
+                    'content' => '',
+                    'assets' => [],
+                    'ki_cost' => $kiCost,
+                    'premium_expires_at' => $premiumExpiresAt,
+                ]);
+
+                $paths = persistChapterAssets($chapter['id'], $chapterNumber, $assets, $storageOptions);
+                $chapter = $chapterRepo->update($chapter['id'], ['assets' => $paths]) ?? $chapter;
+                $created[] = $chapter;
+            }
+
+            echo json_encode(['message' => 'Toplu yükleme tamamlandı', 'created' => $created]);
             break;
         case 'get-ki-settings':
             $settings = $settingRepo->all();
@@ -194,6 +367,61 @@ try {
         case 'get-settings':
             $settings = $settingRepo->all();
             echo json_encode(['data' => $settings]);
+            break;
+        case 'update-site-settings':
+            $updates = [];
+            $siteFields = [
+                'site_name' => 'site_name',
+                'site_tagline' => 'site_tagline',
+                'chapter_storage_driver' => 'chapter_storage_driver',
+                'site_footer' => 'site_footer',
+            ];
+            foreach ($siteFields as $input => $key) {
+                if (!isset($_POST[$input])) {
+                    continue;
+                }
+                $value = trim((string) $_POST[$input]);
+                if ($input === 'chapter_storage_driver' && !in_array($value, ['local', 'ftp'], true)) {
+                    $value = 'local';
+                }
+                $settingRepo->set($key, $value);
+                $updates[$key] = $value;
+            }
+
+            if (!empty($_FILES['site_logo']['tmp_name']) && ($_FILES['site_logo']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $logoPath = persistLogoUpload($_FILES['site_logo']);
+                if ($logoPath !== null) {
+                    $settingRepo->set('site_logo', $logoPath);
+                    $updates['site_logo'] = $logoPath;
+                }
+            }
+
+            echo json_encode(['message' => 'Site ayarları güncellendi', 'data' => $updates]);
+            break;
+        case 'update-storage-settings':
+            $fields = [
+                'ftp_host' => 'ftp_host',
+                'ftp_port' => 'ftp_port',
+                'ftp_username' => 'ftp_username',
+                'ftp_password' => 'ftp_password',
+                'ftp_passive' => 'ftp_passive',
+                'ftp_root' => 'ftp_root',
+                'ftp_base_url' => 'ftp_base_url',
+            ];
+            $updates = [];
+            foreach ($fields as $input => $key) {
+                if (!isset($_POST[$input])) {
+                    continue;
+                }
+                $value = trim((string) $_POST[$input]);
+                if ($input === 'ftp_passive') {
+                    $value = $value === '0' ? '0' : '1';
+                }
+                $settingRepo->set($key, $value);
+                $updates[$key] = $value;
+            }
+
+            echo json_encode(['message' => 'Depolama ayarları güncellendi', 'data' => $updates]);
             break;
         case 'update-settings':
             $allowed = ['primary_color', 'accent_color', 'background_color', 'gradient_start', 'gradient_end'];
@@ -573,14 +801,24 @@ function prepareChapterAssets(): array
  * @param array<int, array{tmp_name: string, extension: string, uploaded: bool}> $assets
  * @return array<int, string>
  */
-function persistChapterAssets(int $chapterId, string $chapterNumber, array $assets): array
+function persistChapterAssets(int $chapterId, string $chapterNumber, array $assets, array $storage): array
 {
-    $baseDir = __DIR__ . '/../public/uploads/chapters';
+    $driver = $storage['driver'] ?? 'local';
+
+    if ($driver === 'ftp') {
+        return persistChapterAssetsFtp($chapterId, $chapterNumber, $assets, $storage['ftp'] ?? []);
+    }
+
+    return persistChapterAssetsLocal($chapterId, $chapterNumber, $assets, $storage['local_root'] ?? (__DIR__ . '/../public/uploads/chapters'));
+}
+
+function persistChapterAssetsLocal(int $chapterId, string $chapterNumber, array $assets, string $baseDir): array
+{
     if (!is_dir($baseDir)) {
         mkdir($baseDir, 0775, true);
     }
 
-    $chapterDir = $baseDir . '/' . $chapterId;
+    $chapterDir = rtrim($baseDir, '/') . '/' . $chapterId;
     if (!is_dir($chapterDir)) {
         mkdir($chapterDir, 0775, true);
     }
@@ -593,7 +831,7 @@ function persistChapterAssets(int $chapterId, string $chapterNumber, array $asse
         $target = $chapterDir . '/' . $filename;
 
         $moved = false;
-        if ($asset['uploaded']) {
+        if (!empty($asset['uploaded'])) {
             $moved = move_uploaded_file($asset['tmp_name'], $target);
         } else {
             $moved = rename($asset['tmp_name'], $target);
@@ -608,6 +846,165 @@ function persistChapterAssets(int $chapterId, string $chapterNumber, array $asse
 
     return $saved;
 }
+
+function persistChapterAssetsFtp(int $chapterId, string $chapterNumber, array $assets, array $config): array
+{
+    $host = trim($config['host'] ?? '');
+    if ($host === '') {
+        throw new InvalidArgumentException('FTP yapılandırması eksik.');
+    }
+
+    $port = (int) ($config['port'] ?? 21);
+    $connection = @ftp_connect($host, $port, 30);
+    if (!$connection) {
+        throw new RuntimeException('FTP sunucusuna bağlanılamadı.');
+    }
+
+    $username = $config['username'] ?? '';
+    $password = $config['password'] ?? '';
+    if (!@ftp_login($connection, $username, $password)) {
+        ftp_close($connection);
+        throw new RuntimeException('FTP kimlik doğrulaması başarısız.');
+    }
+
+    if (array_key_exists('passive', $config)) {
+        @ftp_pasv($connection, (bool) $config['passive']);
+    }
+
+    $remoteRoot = rtrim((string) ($config['root'] ?? ''), '/');
+    $chapterFolder = ($remoteRoot !== '' ? $remoteRoot . '/' : '') . $chapterId;
+    ftpEnsureDirectory($connection, $chapterFolder);
+
+    $saved = [];
+    $index = 1;
+    foreach ($assets as $asset) {
+        $extension = $asset['extension'];
+        $filename = sprintf('%03d-%s.%s', $index++, Slugger::slugify($chapterNumber) ?: 'bolum', $extension);
+        $remotePath = $chapterFolder . '/' . $filename;
+
+        $success = @ftp_put($connection, $remotePath, $asset['tmp_name'], FTP_BINARY);
+        if (!$success) {
+            continue;
+        }
+
+        if (empty($asset['uploaded']) && is_file($asset['tmp_name'])) {
+            @unlink($asset['tmp_name']);
+        }
+
+        $baseUrl = trim((string) ($config['base_url'] ?? ''));
+        if ($baseUrl !== '') {
+            $saved[] = trim(rtrim($baseUrl, '/') . '/' . $chapterId . '/' . $filename, '/');
+        } else {
+            $saved[] = 'uploads/chapters/' . $chapterId . '/' . $filename;
+        }
+    }
+
+    ftp_close($connection);
+
+    return $saved;
+}
+
+function ftpEnsureDirectory($connection, string $path): void
+{
+    $normalized = preg_replace('#/+#', '/', $path);
+    $segments = array_filter(explode('/', $normalized), 'strlen');
+    $current = '';
+    foreach ($segments as $segment) {
+        $current .= '/' . $segment;
+        @ftp_mkdir($connection, $current);
+    }
+}
+
+function resolveChapterStorage(SettingRepository $settings, ?string $overrideDriver): array
+{
+    $driver = strtolower((string) ($overrideDriver ?: ($settings->get('chapter_storage_driver', 'local') ?? 'local')));
+    if (!in_array($driver, ['local', 'ftp'], true)) {
+        $driver = 'local';
+    }
+
+    $ftpConfig = [
+        'host' => (string) ($settings->get('ftp_host') ?? ''),
+        'port' => (int) ($settings->get('ftp_port') ?? 21),
+        'username' => (string) ($settings->get('ftp_username') ?? ''),
+        'password' => (string) ($settings->get('ftp_password') ?? ''),
+        'passive' => (int) ($settings->get('ftp_passive') ?? 1) === 1,
+        'root' => (string) ($settings->get('ftp_root') ?? '/public_html/chapters'),
+        'base_url' => (string) ($settings->get('ftp_base_url') ?? ''),
+    ];
+
+    return [
+        'driver' => $driver,
+        'local_root' => __DIR__ . '/../public/uploads/chapters',
+        'ftp' => $ftpConfig,
+    ];
+}
+
+function prepareChapterBundle(string $zipPath): array
+{
+    $zip = new ZipArchive();
+    if ($zip->open($zipPath) !== true) {
+        throw new InvalidArgumentException('ZIP dosyası açılamadı.');
+    }
+
+    $chapters = [];
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'avif'];
+
+    for ($i = 0; $i < $zip->numFiles; $i++) {
+        $entry = $zip->getNameIndex($i);
+        if (!$entry || str_ends_with($entry, '/')) {
+            continue;
+        }
+
+        $parts = explode('/', $entry, 2);
+        $folder = count($parts) > 1 ? trim($parts[0]) : '';
+        if ($folder === '') {
+            $folder = '__single__';
+        }
+
+        $extension = strtolower((string) pathinfo($entry, PATHINFO_EXTENSION));
+        if (!in_array($extension, $allowed, true)) {
+            continue;
+        }
+
+        if (!isset($chapters[$folder])) {
+            $chapters[$folder] = [];
+        }
+
+        if (count($chapters[$folder]) >= CHAPTER_ASSET_MAX_COUNT) {
+            throw new InvalidArgumentException(sprintf('Her bölüm için en fazla %d dosya yüklenebilir.', CHAPTER_ASSET_MAX_COUNT));
+        }
+
+        $contents = $zip->getFromIndex($i);
+        if ($contents === false) {
+            continue;
+        }
+        if (strlen($contents) > CHAPTER_ASSET_MAX_SIZE) {
+            throw new InvalidArgumentException('ZIP içindeki dosyalar 15 MB sınırını aşamaz.');
+        }
+
+        $tempPath = tempnam(sys_get_temp_dir(), 'bundle_');
+        if ($tempPath === false) {
+            continue;
+        }
+        file_put_contents($tempPath, $contents);
+        $chapters[$folder][] = [
+            'tmp_name' => $tempPath,
+            'extension' => $extension,
+            'uploaded' => false,
+        ];
+    }
+
+    $zip->close();
+
+    if (count($chapters) === 1 && isset($chapters['__single__'])) {
+        throw new InvalidArgumentException('Toplu yükleme için zip dosyası klasörlere ayrılmalıdır.');
+    }
+
+    unset($chapters['__single__']);
+
+    return $chapters;
+}
+
 
 function persistLogoUpload(array $file): ?string
 {

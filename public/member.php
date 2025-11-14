@@ -30,6 +30,7 @@ $analytics = $context['analytics'];
 $pdo = Database::getConnection();
 $userRepo = new UserRepository($pdo);
 $settingRepo = new SettingRepository($pdo);
+$allSettings = $settingRepo->all();
 $themeDefaults = [
     'primary_color' => '#5f2c82',
     'accent_color' => '#49a09d',
@@ -37,7 +38,9 @@ $themeDefaults = [
     'gradient_start' => '#5f2c82',
     'gradient_end' => '#49a09d',
 ];
-$theme = array_replace($themeDefaults, $settingRepo->all());
+$theme = array_replace($themeDefaults, $allSettings);
+$footerText = trim((string) ($allSettings['site_footer'] ?? ''));
+$defaultFooter = '© ' . date('Y') . ' ' . $site['name'] . '. Tüm hakları saklıdır.';
 
 $profile = $userRepo->findByUsername($username);
 $notFound = false;
@@ -178,7 +181,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
 
     <footer class="py-4 bg-black text-secondary">
       <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
-        <small>© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>. Tüm hakları saklıdır.</small>
+        <small><?= $footerText !== '' ? $footerText : htmlspecialchars($defaultFooter) ?></small>
         <?php if (!empty($footerMenuItems)): ?>
           <ul class="nav footer-menu">
             <?php foreach ($footerMenuItems as $item): ?>

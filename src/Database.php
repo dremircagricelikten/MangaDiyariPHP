@@ -6,6 +6,7 @@ use DateTimeImmutable;
 use InvalidArgumentException;
 use PDO;
 use PDOException;
+use Throwable;
 
 class Database
 {
@@ -147,6 +148,7 @@ class Database
             description TEXT NULL,
             cover_image TEXT NULL,
             author VARCHAR(255) NULL,
+            artist VARCHAR(255) NULL,
             status VARCHAR(32) NULL,
             genres TEXT NULL,
             tags TEXT NULL,
@@ -189,6 +191,8 @@ class Database
             created_at DATETIME NOT NULL,
             updated_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        self::ensureColumn($pdo, 'mysql', 'mangas', 'artist', 'VARCHAR(255) NULL');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_unlocks (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
@@ -316,6 +320,7 @@ class Database
             description TEXT,
             cover_image TEXT,
             author TEXT,
+            artist TEXT,
             status TEXT,
             genres TEXT,
             tags TEXT,
@@ -358,6 +363,8 @@ class Database
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )');
+
+        self::ensureColumn($pdo, 'sqlite', 'mangas', 'artist', 'TEXT');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_unlocks (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -512,6 +519,15 @@ class Database
             'ki_read_reward_per_minute' => '2',
             'ki_market_enabled' => '1',
             'ki_unlock_default_duration' => '168',
+            'chapter_storage_driver' => 'local',
+            'site_footer' => '',
+            'ftp_host' => '',
+            'ftp_port' => '21',
+            'ftp_username' => '',
+            'ftp_password' => '',
+            'ftp_passive' => '1',
+            'ftp_root' => '/public_html/chapters',
+            'ftp_base_url' => '',
         ];
 
         foreach ($settings as $key => $value) {

@@ -162,6 +162,13 @@ class ChapterRepository
         return $row;
     }
 
+
+    public function delete(int $id): bool
+    {
+        $stmt = $this->db->prepare('DELETE FROM chapters WHERE id = :id');
+        return $stmt->execute([':id' => $id]);
+    }
+
     public function count(array $filters = []): int
     {
         $query = 'SELECT COUNT(*) FROM chapters';
