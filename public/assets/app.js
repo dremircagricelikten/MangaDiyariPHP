@@ -3,6 +3,16 @@ $(function () {
   const popularWidget = widgets.popular_slider || null;
   const latestWidget = widgets.latest_updates || null;
 
+  function truncate(text, length) {
+    if (!text) {
+      return '';
+    }
+    if (text.length <= length) {
+      return text;
+    }
+    return `${text.substring(0, length - 1)}…`;
+  }
+
   function loadMangaList(params = {}) {
     $.getJSON('api.php', Object.assign({ action: 'list' }, params))
       .done(({ data }) => {
@@ -10,7 +20,7 @@ $(function () {
         container.empty();
 
         if (!data.length) {
-          container.append('<div class="col-12"><div class="alert alert-secondary">Hiç sonuç bulunamadı.</div></div>');
+          container.append('<div class="col-12"><div class="empty-state">Henüz sonuç bulunamadı.</div></div>');
           return;
         }
 
@@ -19,7 +29,7 @@ $(function () {
         });
       })
       .fail((xhr) => {
-        $('#manga-list').html(`<div class="col-12"><div class="alert alert-danger">Listeler alınamadı: ${xhr.responseJSON?.error || xhr.statusText}</div></div>`);
+        $('#manga-list').html(`<div class="col-12"><div class="empty-state empty-state--danger">Listeler alınamadı: ${xhr.responseJSON?.error || xhr.statusText}</div></div>`);
       });
   }
 
@@ -36,56 +46,98 @@ $(function () {
   function renderMangaCard(manga) {
     const cover = manga.cover_image || 'https://placehold.co/400x600?text=Manga';
     const url = `manga.php?slug=${encodeURIComponent(manga.slug)}`;
+    const author = manga.author || 'Bilinmiyor';
     return `
-      <div class="col-md-4 col-lg-3 mb-4">
-        <div class="card h-100 bg-secondary text-light border-0 shadow-sm">
-          <img src="${cover}" class="card-img-top" alt="${manga.title} kapağı">
-          <div class="card-body d-flex flex-column">
-            <h5 class="card-title">${manga.title}</h5>
-            <p class="card-text text-truncate-3">${manga.description || 'Açıklama bulunmuyor.'}</p>
-            <div class="mt-auto d-flex justify-content-between align-items-center">
-              <span class="badge bg-info">${formatStatus(manga.status)}</span>
-              <a href="${url}" class="btn btn-outline-light btn-sm">Seri Detayı</a>
+      <div class="col-sm-6 col-lg-4 col-xxl-3">
+        <article class="manga-card">
+          <a href="${url}" class="manga-card__media" style="background-image:url('${cover}')">
+            <span class="manga-card__status">${formatStatus(manga.status)}</span>
+          </a>
+          <div class="manga-card__body">
+            <h3 class="manga-card__title"><a href="${url}">${manga.title}</a></h3>
+            <p class="manga-card__description text-truncate-3">${manga.description || 'Açıklama bulunmuyor.'}</p>
+            <div class="manga-card__meta">
+              <span><i class="bi bi-person"></i> ${author}</span>
             </div>
+            <a href="${url}" class="btn btn-sm btn-primary w-100">Seri Detayı</a>
           </div>
-        </div>
+        </article>
       </div>`;
   }
 
-  function renderCarousel(data) {
-    const container = $('#featured-content');
+  function renderFeaturedHighlight(data) {
+    const container = $('#featured-highlight');
     if (!container.length) {
       return;
     }
+
     container.empty();
 
     if (!data.length) {
-      container.append('<div class="carousel-item active"><img src="https://placehold.co/800x500?text=Manga" class="d-block w-100" alt="Öne çıkan"></div>');
+      container.append('<div class="feature-placeholder">Popüler seriler yakında burada yer alacak.</div>');
       return;
     }
 
-    data.forEach((manga, index) => {
-      container.append(`
-        <div class="carousel-item ${index === 0 ? 'active' : ''}">
-          <img src="${manga.cover_image || 'https://placehold.co/800x500?text=Manga'}" class="d-block w-100" alt="${manga.title}">
-          <div class="carousel-caption d-none d-md-block">
-            <h5>${manga.title}</h5>
-            <p>${manga.description ? manga.description.substring(0, 120) + '…' : ''}</p>
+    const featured = data[0];
+    const cover = featured.cover_image || 'https://placehold.co/1200x700?text=Manga';
+    const url = `manga.php?slug=${encodeURIComponent(featured.slug)}`;
+
+    container.html(`
+      <a class="feature-card" href="${url}" style="background-image:url('${cover}')">
+        <div class="feature-card__overlay">
+          <span class="feature-card__badge">${formatStatus(featured.status)}</span>
+          <h3>${featured.title}</h3>
+          <p>${truncate(featured.description || 'Topluluğun sevdiği popüler serilerden biri.', 180)}</p>
+          <div class="feature-card__actions">
+            <span><i class="bi bi-person"></i> ${featured.author || 'Bilinmiyor'}</span>
+            <span class="feature-card__cta">Seriye Git <i class="bi bi-arrow-right"></i></span>
           </div>
         </div>
-      `);
+      </a>
+    `);
+  }
+
+  function renderFeaturedItem(manga) {
+    const cover = manga.cover_image || 'https://placehold.co/160x220?text=Manga';
+    const url = `manga.php?slug=${encodeURIComponent(manga.slug)}`;
+    return `
+      <a class="featured-item" href="${url}">
+        <span class="featured-item__media" style="background-image:url('${cover}')"></span>
+        <span class="featured-item__content">
+          <span class="featured-item__title">${manga.title}</span>
+          <span class="featured-item__meta">${formatStatus(manga.status)} · ${manga.author || 'Bilinmiyor'}</span>
+        </span>
+      </a>`;
+  }
+
+  function renderFeaturedRail(data) {
+    const container = $('#featured-rail');
+    if (!container.length) {
+      return;
+    }
+
+    container.empty();
+
+    if (!data.length) {
+      container.append('<div class="empty-state">Öne çıkan seri bulunamadı.</div>');
+      return;
+    }
+
+    data.slice(0, 6).forEach((manga) => {
+      container.append(renderFeaturedItem(manga));
     });
   }
 
   function renderFeaturedGrid(data) {
-    const container = $('#featured-list');
+    const container = $('#featured-grid');
     if (!container.length) {
       return;
     }
+
     container.empty();
 
     if (!data.length) {
-      container.append('<div class="col-12"><div class="alert alert-secondary">Popüler seri bulunamadı.</div></div>');
+      container.append('<div class="col-12"><div class="empty-state">Popüler seri bulunamadı.</div></div>');
       return;
     }
 
@@ -109,28 +161,23 @@ $(function () {
     const chapterUrl = `chapter.php?slug=${encodeURIComponent(chapter.manga_slug)}&chapter=${encodeURIComponent(chapter.number)}`;
     const chapterTitle = chapter.title || `Bölüm ${chapter.number}`;
     return `
-      <div class="col-md-6 col-lg-4 mb-4">
-        <div class="card h-100 bg-secondary text-light border-0 shadow-sm">
-          <div class="row g-0 h-100">
-            <div class="col-4">
-              <img src="${cover}" class="img-fluid rounded-start h-100 object-fit-cover" alt="${chapter.manga_title} kapağı">
+      <div class="col-xl-4 col-lg-6">
+        <article class="update-card">
+          <div class="update-card__media" style="background-image:url('${cover}')"></div>
+          <div class="update-card__body">
+            <div class="update-card__series">${chapter.manga_title}</div>
+            <div class="update-card__chapter">Bölüm ${chapter.number}</div>
+            <p class="update-card__title text-truncate-3">${chapterTitle}</p>
+            <div class="update-card__meta">
+              <span><i class="bi bi-calendar-event"></i> ${formatDate(chapter.created_at)}</span>
+              ${chapter.ki_cost > 0 ? '<span class="badge bg-warning text-dark">Premium</span>' : ''}
             </div>
-            <div class="col-8">
-              <div class="card-body d-flex flex-column">
-                <h5 class="card-title mb-1">${chapter.manga_title}</h5>
-                <div class="small text-secondary mb-2">Bölüm ${chapter.number}</div>
-                <p class="card-text text-truncate-3 mb-2">${chapterTitle}</p>
-                <div class="mt-auto d-flex justify-content-between align-items-center gap-2">
-                  <small class="text-secondary">${formatDate(chapter.created_at)}</small>
-                  <div class="btn-group btn-group-sm">
-                    <a href="${mangaUrl}" class="btn btn-outline-light">Seri</a>
-                    <a href="${chapterUrl}" class="btn btn-primary">Oku</a>
-                  </div>
-                </div>
-              </div>
+            <div class="update-card__actions">
+              <a href="${mangaUrl}" class="btn btn-outline-light btn-sm">Seri</a>
+              <a href="${chapterUrl}" class="btn btn-primary btn-sm">Oku</a>
             </div>
           </div>
-        </div>
+        </article>
       </div>`;
   }
 
@@ -142,7 +189,7 @@ $(function () {
     container.empty();
 
     if (!chapters.length) {
-      container.append('<div class="col-12"><div class="alert alert-secondary">Yeni bölüm bulunamadı.</div></div>');
+      container.append('<div class="col-12"><div class="empty-state">Yeni bölüm bulunamadı.</div></div>');
       return;
     }
 
@@ -171,7 +218,8 @@ $(function () {
 
       $.getJSON('api.php', params)
         .done(({ data }) => {
-          renderCarousel(data);
+          renderFeaturedHighlight(data);
+          renderFeaturedRail(data);
           renderFeaturedGrid(data);
         });
     }

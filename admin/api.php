@@ -175,6 +175,16 @@ try {
             $kiRepo->deleteMarketOffer($offerId);
             echo json_encode(['message' => 'Teklif silindi']);
             break;
+        case 'dashboard-stats':
+            $stats = [
+                'manga_total' => $mangaRepo->count(),
+                'chapter_total' => $chapterRepo->count(),
+                'chapter_premium' => $chapterRepo->count(['premium_only' => true]),
+                'active_members' => $userRepo->count(['active' => true]),
+            ];
+
+            echo json_encode(['data' => $stats]);
+            break;
         case 'get-settings':
             $settings = $settingRepo->all();
             echo json_encode(['data' => $settings]);

@@ -145,4 +145,25 @@ class MangaRepository
     {
         return $this->getPopular(['limit' => $limit]);
     }
+
+    public function count(array $filters = []): int
+    {
+        $query = 'SELECT COUNT(*) FROM mangas';
+        $conditions = [];
+        $params = [];
+
+        if (!empty($filters['status'])) {
+            $conditions[] = 'status = :status';
+            $params[':status'] = $filters['status'];
+        }
+
+        if ($conditions) {
+            $query .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute($params);
+
+        return (int) $stmt->fetchColumn();
+    }
 }

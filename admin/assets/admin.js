@@ -25,6 +25,22 @@ $(function () {
       });
   }
 
+  function applyDashboardStats(stats = {}) {
+    Object.entries(stats).forEach(([key, value]) => {
+      const target = $(`[data-dashboard-stat="${key}"]`);
+      if (target.length) {
+        target.text(new Intl.NumberFormat('tr-TR').format(Number(value) || 0));
+      }
+    });
+  }
+
+  function refreshDashboardStats() {
+    $.getJSON('api.php', { action: 'dashboard-stats' })
+      .done(({ data }) => {
+        applyDashboardStats(data || {});
+      });
+  }
+
   $('#manga-form').on('submit', function (event) {
     event.preventDefault();
     const form = $(this);
@@ -34,6 +50,7 @@ $(function () {
         message.html(`<div class="alert alert-success">${response.message}</div>`);
         form.trigger('reset');
         refreshMangaOptions();
+        refreshDashboardStats();
       })
       .fail((xhr) => handleError(xhr, message));
   });
@@ -54,11 +71,15 @@ $(function () {
       .done((response) => {
         message.html(`<div class="alert alert-success">${response.message}</div>`);
         form[0].reset();
+        refreshDashboardStats();
       })
       .fail((xhr) => handleError(xhr, message));
   });
 
   refreshMangaOptions();
+  if (window.dashboardStats) {
+    applyDashboardStats(window.dashboardStats);
+  }
 
   function loadThemeSettings() {
     $.getJSON('api.php', { action: 'get-settings' })
@@ -315,6 +336,7 @@ $(function () {
         message.html(`<div class="alert alert-success">${response.message}</div>`);
         form.trigger('reset');
         loadUsers();
+        refreshDashboardStats();
       })
       .fail((xhr) => handleError(xhr, message));
   });
@@ -338,6 +360,7 @@ $(function () {
       .done((response) => {
         message.addClass('text-success').text(response.message);
         row.find('.user-password').val('');
+        refreshDashboardStats();
       })
       .fail((xhr) => {
         if (xhr.status === 403) {

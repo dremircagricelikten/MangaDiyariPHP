@@ -8,12 +8,19 @@ require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/WidgetRepository.php';
 require_once __DIR__ . '/../src/SiteContext.php';
 require_once __DIR__ . '/../src/MenuRepository.php';
+require_once __DIR__ . '/../src/MangaRepository.php';
+require_once __DIR__ . '/../src/ChapterRepository.php';
+require_once __DIR__ . '/../src/UserRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
 use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\WidgetRepository;
 use MangaDiyari\Core\SiteContext;
+use MangaDiyari\Core\MenuRepository;
+use MangaDiyari\Core\MangaRepository;
+use MangaDiyari\Core\ChapterRepository;
+use MangaDiyari\Core\UserRepository;
 
 Auth::start();
 $user = Auth::user();
@@ -27,6 +34,9 @@ $analytics = $context['analytics'];
 $pdo = Database::getConnection();
 $settingRepo = new SettingRepository($pdo);
 $widgetRepo = new WidgetRepository($pdo);
+$mangaRepo = new MangaRepository($pdo);
+$chapterRepo = new ChapterRepository($pdo);
+$userRepo = new UserRepository($pdo);
 
 $allSettings = $settingRepo->all();
 $themeDefaults = [
@@ -51,6 +61,13 @@ $latestWidget = $activeWidgets['latest_updates'] ?? null;
 
 $primaryMenuItems = $menus['primary']['items'] ?? [];
 $footerMenuItems = $menus['footer']['items'] ?? [];
+
+$siteStats = [
+    'manga_total' => $mangaRepo->count(),
+    'chapter_total' => $chapterRepo->count(),
+    'premium_total' => $chapterRepo->count(['premium_only' => true]),
+    'active_members' => $userRepo->count(['active' => true]),
+];
 ?>
 <!doctype html>
 <html lang="tr">
@@ -65,6 +82,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       <?= $analytics['google'] ?>
     <?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="assets/styles.css">
     <style>
       :root {
@@ -76,9 +94,9 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       }
     </style>
   </head>
-  <body class="bg-dark text-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient shadow-sm">
-      <div class="container">
+  <body class="site-body">
+    <nav class="navbar navbar-expand-lg navbar-dark site-navbar shadow-sm">
+      <div class="container-xxl">
         <a class="navbar-brand d-flex align-items-center gap-2" href="/">
           <?php if (!empty($site['logo'])): ?>
             <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
@@ -119,7 +137,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
 
     <?php if (!empty($ads['header'])): ?>
       <section class="ad-slot ad-slot--header py-3">
-        <div class="container">
+        <div class="container-xxl">
           <div class="ad-wrapper text-center">
             <?= $ads['header'] ?>
           </div>
@@ -127,19 +145,21 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       </section>
     <?php endif; ?>
 
-    <?php if ($popularWidget): ?>
-    <header class="hero py-5">
-      <div class="container">
-        <div class="row align-items-center">
-          <div class="col-lg-7">
-            <h1 class="display-5 fw-bold"><?= htmlspecialchars($site['tagline']) ?></h1>
-            <p class="lead">Topluluk tarafından yönetilen koleksiyonumuzla yeni seriler keşfedin, favorilerinizi takip edin ve anında yeni bölümlerden haberdar olun.</p>
-            <form id="search-form" class="mt-4">
+    <header class="landing-hero py-5">
+      <div class="container-xxl">
+        <div class="row g-5 align-items-center">
+          <div class="col-xl-5">
+            <span class="eyebrow">Topluluk Mangaları</span>
+            <h1 class="display-5 fw-bold mb-3"><?= htmlspecialchars($site['tagline']) ?></h1>
+            <p class="lead text-secondary">Yeni seriler keşfedin, favorilerinizi takip edin ve toplulukla beraber anında yeni bölümlerden haberdar olun.</p>
+            <form id="search-form" class="landing-search mt-4">
               <div class="row g-2">
-                <div class="col-md-6">
+                <div class="col-lg-6">
+                  <label class="form-label" for="search">Seri Ara</label>
                   <input type="search" id="search" class="form-control form-control-lg" placeholder="Manga ara...">
                 </div>
-                <div class="col-md-4">
+                <div class="col-lg-4">
+                  <label class="form-label" for="status">Durum</label>
                   <select id="status" class="form-select form-select-lg">
                     <option value="">Tüm Seriler</option>
                     <option value="ongoing">Devam Ediyor</option>
@@ -147,14 +167,37 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                     <option value="hiatus">Ara Verildi</option>
                   </select>
                 </div>
-                <div class="col-md-2 d-grid">
+                <div class="col-lg-2 d-grid">
+                  <label class="form-label opacity-0">Ara</label>
                   <button class="btn btn-primary btn-lg" type="submit">Ara</button>
                 </div>
               </div>
             </form>
-            <div class="widget-controls mt-4">
-              <div class="row g-2 align-items-end">
-                <div class="col-sm-4">
+            <div class="hero-stats mt-4">
+              <div class="hero-stat">
+                <span class="hero-stat__label">Seri</span>
+                <span class="hero-stat__value"><?= number_format($siteStats['manga_total']) ?></span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat__label">Bölüm</span>
+                <span class="hero-stat__value"><?= number_format($siteStats['chapter_total']) ?></span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat__label">Premium</span>
+                <span class="hero-stat__value"><?= number_format($siteStats['premium_total']) ?></span>
+              </div>
+              <div class="hero-stat">
+                <span class="hero-stat__label">Aktif Üye</span>
+                <span class="hero-stat__value"><?= number_format($siteStats['active_members']) ?></span>
+              </div>
+            </div>
+          </div>
+          <div class="col-xl-7">
+            <div class="hero-showcase">
+              <div id="featured-highlight" class="feature-highlight"></div>
+              <?php if ($popularWidget): ?>
+              <div class="feature-controls d-flex flex-wrap gap-3 align-items-end">
+                <div>
                   <label for="popular-sort" class="form-label small text-uppercase">Sıralama</label>
                   <select id="popular-sort" class="form-select">
                     <option value="random">Rastgele</option>
@@ -163,7 +206,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                     <option value="alphabetical">Alfabetik</option>
                   </select>
                 </div>
-                <div class="col-sm-4">
+                <div>
                   <label for="popular-status" class="form-label small text-uppercase">Durum</label>
                   <select id="popular-status" class="form-select">
                     <option value="">Tümü</option>
@@ -173,106 +216,85 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                   </select>
                 </div>
               </div>
-            </div>
-          </div>
-          <div class="col-lg-5 d-none d-lg-block">
-            <div class="hero-card shadow">
-              <div id="featured-carousel" class="carousel slide" data-bs-ride="carousel">
-                <div class="carousel-inner" id="featured-content"></div>
-              </div>
+              <div id="featured-rail" class="featured-rail mt-3"></div>
+              <?php else: ?>
+              <div class="feature-placeholder">Popüler widget etkin değil. Yönetim panelinden ana sayfa bileşenlerini düzenleyebilirsiniz.</div>
+              <?php endif; ?>
             </div>
           </div>
         </div>
       </div>
     </header>
-    <?php else: ?>
-    <section class="bg-dark py-5 border-bottom border-secondary">
-      <div class="container">
-        <div class="row g-4 align-items-center">
-          <div class="col-lg-8">
-            <h1 class="display-5 fw-bold mb-3"><?= htmlspecialchars($site['tagline']) ?></h1>
-            <p class="lead mb-0">Topluluk tarafından yönetilen koleksiyonumuzla yeni seriler keşfedin, favorilerinizi takip edin ve anında yeni bölümlerden haberdar olun.</p>
-          </div>
-          <div class="col-lg-4">
-            <form id="search-form" class="row g-2">
-              <div class="col-12">
-                <input type="search" id="search" class="form-control form-control-lg" placeholder="Manga ara...">
-              </div>
-              <div class="col-12">
-                <select id="status" class="form-select form-select-lg">
-                  <option value="">Tüm Seriler</option>
-                  <option value="ongoing">Devam Ediyor</option>
-                  <option value="completed">Tamamlandı</option>
-                  <option value="hiatus">Ara Verildi</option>
-                </select>
-              </div>
-              <div class="col-12 d-grid">
-                <button class="btn btn-primary btn-lg" type="submit">Ara</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    </section>
-    <?php endif; ?>
 
-    <main class="container my-5">
-      <div class="row g-4">
-        <div class="col-lg-9">
-          <?php if ($latestWidget): ?>
-          <section id="latest-updates" class="mb-5">
-            <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3 mb-3">
-              <div>
-                <h2 class="section-title mb-0"><?= htmlspecialchars($latestWidget['title']) ?></h2>
-                <span class="text-secondary small">Yeni yüklenen bölümleri anında görüntüleyin.</span>
-              </div>
-              <div class="widget-controls d-flex gap-2 flex-wrap">
+    <main class="landing-main py-5">
+      <div class="container-xxl">
+        <div class="row g-4">
+          <div class="<?= !empty($ads['sidebar']) ? 'col-xxl-9' : 'col-12' ?>">
+            <?php if ($latestWidget): ?>
+            <section id="latest-updates" class="landing-section">
+              <div class="section-header">
                 <div>
-                  <label for="latest-sort" class="form-label small text-uppercase">Sıralama</label>
-                  <select id="latest-sort" class="form-select form-select-sm">
-                    <option value="newest">En Yeni</option>
-                    <option value="oldest">En Eski</option>
-                    <option value="chapter_desc">Bölüm No (Azalan)</option>
-                    <option value="chapter_asc">Bölüm No (Artan)</option>
-                  </select>
+                  <span class="eyebrow">Anlık Güncellemeler</span>
+                  <h2><?= htmlspecialchars($latestWidget['title']) ?></h2>
+                  <p class="text-secondary">Yeni yüklenen bölümleri yakalayın.</p>
                 </div>
-                <div>
-                  <label for="latest-status" class="form-label small text-uppercase">Durum</label>
-                  <select id="latest-status" class="form-select form-select-sm">
-                    <option value="">Tümü</option>
-                    <option value="ongoing">Devam Ediyor</option>
-                    <option value="completed">Tamamlandı</option>
-                    <option value="hiatus">Ara Verildi</option>
-                  </select>
+                <div class="widget-controls d-flex gap-3 flex-wrap">
+                  <div>
+                    <label for="latest-sort" class="form-label small text-uppercase">Sıralama</label>
+                    <select id="latest-sort" class="form-select form-select-sm">
+                      <option value="newest">En Yeni</option>
+                      <option value="oldest">En Eski</option>
+                      <option value="chapter_desc">Bölüm No (Azalan)</option>
+                      <option value="chapter_asc">Bölüm No (Artan)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label for="latest-status" class="form-label small text-uppercase">Durum</label>
+                    <select id="latest-status" class="form-select form-select-sm">
+                      <option value="">Tümü</option>
+                      <option value="ongoing">Devam Ediyor</option>
+                      <option value="completed">Tamamlandı</option>
+                      <option value="hiatus">Ara Verildi</option>
+                    </select>
+                  </div>
                 </div>
               </div>
-            </div>
-            <div class="row" id="latest-list"></div>
-          </section>
-          <?php endif; ?>
+              <div class="row g-4" id="latest-list"></div>
+            </section>
+            <?php endif; ?>
 
-          <section id="yeniler" class="mb-5">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-              <h2 class="section-title">Koleksiyon</h2>
-              <span class="text-secondary">Arama sonuçları anlık olarak güncellenir.</span>
-            </div>
-            <div class="row" id="manga-list"></div>
-          </section>
+            <section id="discover" class="landing-section">
+              <div class="section-header">
+                <div>
+                  <span class="eyebrow">Keşfet</span>
+                  <h2>Koleksiyon</h2>
+                  <p class="text-secondary">Arama sonuçları ve popüler mangalar burada listelenir.</p>
+                </div>
+              </div>
+              <div class="row g-4" id="manga-list"></div>
+            </section>
 
-          <?php if ($popularWidget): ?>
-          <section id="populer" class="mb-5">
-            <h2 class="section-title"><?= htmlspecialchars($popularWidget['title']) ?></h2>
-            <div class="row" id="featured-list"></div>
-          </section>
+            <?php if ($popularWidget): ?>
+            <section id="populer" class="landing-section">
+              <div class="section-header">
+                <div>
+                  <span class="eyebrow">Trend</span>
+                  <h2><?= htmlspecialchars($popularWidget['title']) ?></h2>
+                  <p class="text-secondary">Topluluğun favori serileri.</p>
+                </div>
+              </div>
+              <div class="row g-4" id="featured-grid"></div>
+            </section>
+            <?php endif; ?>
+          </div>
+          <?php if (!empty($ads['sidebar'])): ?>
+            <aside class="col-xxl-3">
+              <div class="ad-slot ad-slot--sidebar sticky-lg-top">
+                <?= $ads['sidebar'] ?>
+              </div>
+            </aside>
           <?php endif; ?>
         </div>
-        <?php if (!empty($ads['sidebar'])): ?>
-          <aside class="col-lg-3">
-            <div class="ad-slot ad-slot--sidebar sticky-lg-top">
-              <?= $ads['sidebar'] ?>
-            </div>
-          </aside>
-        <?php endif; ?>
       </div>
     </main>
 
@@ -297,8 +319,8 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       <button class="chat-toggle btn btn-primary rounded-circle" type="button" aria-label="Sohbeti aç">💬</button>
     </div>
 
-    <footer class="py-4 bg-black text-secondary">
-      <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+    <footer class="site-footer py-4">
+      <div class="container-xxl d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
         <small>© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>. Tüm hakları saklıdır.</small>
         <?php if (!empty($footerMenuItems)): ?>
           <ul class="nav footer-menu">
@@ -309,7 +331,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
         <?php endif; ?>
       </div>
       <?php if (!empty($ads['footer'])): ?>
-        <div class="container mt-3">
+        <div class="container-xxl mt-3">
           <div class="ad-slot ad-slot--footer text-center">
             <?= $ads['footer'] ?>
           </div>

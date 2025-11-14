@@ -162,6 +162,31 @@ class ChapterRepository
         return $row;
     }
 
+    public function count(array $filters = []): int
+    {
+        $query = 'SELECT COUNT(*) FROM chapters';
+        $conditions = [];
+        $params = [];
+
+        if (!empty($filters['manga_id'])) {
+            $conditions[] = 'manga_id = :manga_id';
+            $params[':manga_id'] = (int) $filters['manga_id'];
+        }
+
+        if (!empty($filters['premium_only'])) {
+            $conditions[] = 'ki_cost > 0';
+        }
+
+        if ($conditions) {
+            $query .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute($params);
+
+        return (int) $stmt->fetchColumn();
+    }
+
     private function numericOrder(string $column): string
     {
         return $this->driver === 'mysql'
