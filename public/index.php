@@ -1,9 +1,13 @@
 <?php
+ini_set('display_errors', 1);
+ini_set('display_startup_errors', 1);
+error_reporting(E_ALL);
 require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/WidgetRepository.php';
 require_once __DIR__ . '/../src/SiteContext.php';
+require_once __DIR__ . '/../src/MenuRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;

@@ -3,11 +3,11 @@ return [
     'database' => [
         'driver' => getenv('DB_DRIVER') ?: 'mysql',
         'mysql' => [
-            'host' => getenv('DB_HOST') ?: '127.0.0.1',
+            'host' => getenv('DB_HOST') ?: 'localhost',
             'port' => getenv('DB_PORT') ?: '3306',
-            'database' => getenv('DB_NAME') ?: 'mangadiyari',
-            'username' => getenv('DB_USER') ?: 'root',
-            'password' => getenv('DB_PASS') ?: '',
+            'database' => getenv('DB_NAME') ?: 'md_deneme',
+            'username' => getenv('DB_USER') ?: 'md_deneme',
+            'password' => getenv('DB_PASS') ?: '1Jankenguuu...!',
             'charset' => 'utf8mb4',
             'collation' => 'utf8mb4_unicode_ci',
             'options' => [],

@@ -2,6 +2,10 @@
 
 namespace MangaDiyari\Core;
 
+require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/SettingRepository.php';
+require_once __DIR__ . '/MenuRepository.php';
+
 class SiteContext
 {
     public static function build(): array

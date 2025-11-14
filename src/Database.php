@@ -64,12 +64,12 @@ class Database
      */
     private static function connectMysql(array $config): PDO
     {
-        $host = $config['host'] ?? '127.0.0.1';
+        $host = $config['host'] ?? 'localhost';
         $port = $config['port'] ?? '3306';
-        $database = $config['database'] ?? 'mangadiyari';
+        $database = $config['database'] ?? 'md_deneme';
         $charset = $config['charset'] ?? 'utf8mb4';
-        $username = $config['username'] ?? 'root';
-        $password = $config['password'] ?? '';
+        $username = $config['username'] ?? 'md_deneme';
+        $password = $config['password'] ?? '1Jankenguuu...!';
         $options = $config['options'] ?? [];
 
         $dsn = sprintf('mysql:host=%s;port=%s;dbname=%s;charset=%s', $host, $port, $database, $charset);
@@ -583,15 +583,14 @@ class Database
     private static function columnExists(PDO $pdo, string $driver, string $table, string $column): bool
     {
         $table = self::assertIdentifier($table);
+        $column = self::assertIdentifier($column);
 
         if ($driver === 'mysql') {
-            $stmt = $pdo->prepare(sprintf('SHOW COLUMNS FROM `%s` LIKE :column', $table));
-            $stmt->execute([':column' => $column]);
-            return $stmt->fetchColumn() !== false;
+            $stmt = $pdo->query(sprintf('SHOW COLUMNS FROM `%s` LIKE "%s"', $table, $column));
+            return $stmt->fetch() !== false;
         }
 
-        $stmt = $pdo->prepare(sprintf('PRAGMA table_info(`%s`)', $table));
-        $stmt->execute();
+        $stmt = $pdo->query(sprintf('PRAGMA table_info(`%s`)', $table));
         while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
             if (($row['name'] ?? null) === $column) {
                 return true;
