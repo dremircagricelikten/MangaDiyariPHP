@@ -246,4 +246,30 @@ class UserRepository
 
         return $updated;
     }
+
+    public function count(array $filters = []): int
+    {
+        $query = 'SELECT COUNT(*) FROM users';
+        $conditions = [];
+        $params = [];
+
+        if (array_key_exists('active', $filters)) {
+            $conditions[] = 'is_active = :active';
+            $params[':active'] = (int) $filters['active'] ? 1 : 0;
+        }
+
+        if (!empty($filters['role'])) {
+            $conditions[] = 'role = :role';
+            $params[':role'] = $filters['role'];
+        }
+
+        if ($conditions) {
+            $query .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        $stmt = $this->pdo->prepare($query);
+        $stmt->execute($params);
+
+        return (int) $stmt->fetchColumn();
+    }
 }
