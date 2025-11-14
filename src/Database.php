@@ -244,9 +244,21 @@ class Database
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             type VARCHAR(191) NOT NULL UNIQUE,
             title VARCHAR(255) NOT NULL,
+            area VARCHAR(64) NOT NULL DEFAULT "main",
             enabled TINYINT(1) NOT NULL DEFAULT 1,
             sort_order INT NOT NULL DEFAULT 0,
             config LONGTEXT NOT NULL DEFAULT "{}"
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS pages (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL UNIQUE,
+            content LONGTEXT NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT "draft",
+            published_at DATETIME NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS menus (
@@ -275,6 +287,9 @@ class Database
         self::ensureColumn($pdo, 'mysql', 'users', 'ki_balance', 'BIGINT NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'mysql', 'chapters', 'ki_cost', 'INT UNSIGNED NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'mysql', 'chapters', 'premium_expires_at', 'DATETIME NULL');
+        self::ensureColumn($pdo, 'mysql', 'widgets', 'area', "VARCHAR(64) NOT NULL DEFAULT 'main'");
+
+        $pdo->exec("UPDATE widgets SET area = 'main' WHERE area IS NULL OR area = ''");
     }
 
     private static function bootstrapSqlite(PDO $pdo): void
@@ -398,9 +413,21 @@ class Database
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             type TEXT NOT NULL UNIQUE,
             title TEXT NOT NULL,
+            area TEXT NOT NULL DEFAULT "main",
             enabled INTEGER NOT NULL DEFAULT 1,
             sort_order INTEGER NOT NULL DEFAULT 0,
             config TEXT NOT NULL DEFAULT "{}"
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS pages (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            slug TEXT NOT NULL UNIQUE,
+            content TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT "draft",
+            published_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
         )');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS menus (
@@ -429,6 +456,9 @@ class Database
         self::ensureColumn($pdo, 'sqlite', 'users', 'ki_balance', 'INTEGER NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'sqlite', 'chapters', 'ki_cost', 'INTEGER NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'sqlite', 'chapters', 'premium_expires_at', 'TEXT');
+        self::ensureColumn($pdo, 'sqlite', 'widgets', 'area', "TEXT NOT NULL DEFAULT 'main'");
+
+        $pdo->exec("UPDATE widgets SET area = 'main' WHERE area IS NULL OR area = ''");
     }
 
     private static function seedDefaults(PDO $pdo, array $config, string $driver): void
@@ -491,6 +521,7 @@ class Database
         $defaultWidgets = [
             'popular_slider' => [
                 'title' => 'Popüler Seriler',
+                'area' => 'hero',
                 'sort_order' => 1,
                 'config' => [
                     'limit' => 6,
@@ -500,6 +531,7 @@ class Database
             ],
             'latest_updates' => [
                 'title' => 'Yeni Yüklenen Bölümler',
+                'area' => 'main',
                 'sort_order' => 2,
                 'config' => [
                     'limit' => 8,
@@ -510,8 +542,8 @@ class Database
         ];
 
         $widgetCheck = $pdo->prepare('SELECT id FROM widgets WHERE type = :type LIMIT 1');
-        $widgetInsert = $pdo->prepare('INSERT INTO widgets (type, title, enabled, sort_order, config)
-            VALUES (:type, :title, 1, :sort_order, :config)');
+        $widgetInsert = $pdo->prepare('INSERT INTO widgets (type, title, area, enabled, sort_order, config)
+            VALUES (:type, :title, :area, 1, :sort_order, :config)');
 
         foreach ($defaultWidgets as $type => $widget) {
             $widgetCheck->execute([':type' => $type]);
@@ -520,6 +552,7 @@ class Database
                 $widgetInsert->execute([
                     ':type' => $type,
                     ':title' => $widget['title'],
+                    ':area' => $widget['area'] ?? 'main',
                     ':sort_order' => $widget['sort_order'],
                     ':config' => json_encode($widget['config'], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 ]);

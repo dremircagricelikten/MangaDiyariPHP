@@ -17,6 +17,8 @@ require_once __DIR__ . '/../src/WidgetRepository.php';
 require_once __DIR__ . '/../src/UserRepository.php';
 require_once __DIR__ . '/../src/MenuRepository.php';
 require_once __DIR__ . '/../src/KiRepository.php';
+require_once __DIR__ . '/../src/PageRepository.php';
+require_once __DIR__ . '/../src/InteractionRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
@@ -26,8 +28,10 @@ use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\WidgetRepository;
 use MangaDiyari\Core\UserRepository;
 use MangaDiyari\Core\MenuRepository;
-use MangaDiyari\Core\Slugger;
 use MangaDiyari\Core\KiRepository;
+use MangaDiyari\Core\PageRepository;
+use MangaDiyari\Core\InteractionRepository;
+use MangaDiyari\Core\Slugger;
 
 Auth::start();
 if (!Auth::checkRole(['admin', 'editor'])) {
@@ -45,6 +49,8 @@ try {
     $userRepo = new UserRepository($pdo);
     $menuRepo = new MenuRepository($pdo);
     $kiRepo = new KiRepository($pdo);
+    $pageRepo = new PageRepository($pdo);
+    $interactionRepo = new InteractionRepository($pdo);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
@@ -224,6 +230,7 @@ try {
 
             $updated = $widgetRepo->update($widgetId, [
                 'title' => trim((string) ($_POST['title'] ?? '')),
+                'area' => trim((string) ($_POST['area'] ?? 'main')) ?: 'main',
                 'enabled' => isset($_POST['enabled']) ? (int) $_POST['enabled'] : 0,
                 'sort_order' => isset($_POST['sort_order']) ? (int) $_POST['sort_order'] : 0,
                 'config' => $config,
@@ -234,6 +241,63 @@ try {
             }
 
             echo json_encode(['message' => 'Widget güncellendi', 'widget' => $updated]);
+            break;
+        case 'list-pages':
+            $status = isset($_GET['status']) ? (string) $_GET['status'] : null;
+            $search = isset($_GET['search']) ? (string) $_GET['search'] : null;
+            $pages = $pageRepo->list([
+                'status' => $status,
+                'search' => $search,
+            ]);
+            echo json_encode(['data' => $pages]);
+            break;
+        case 'get-page':
+            $pageId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($pageId <= 0) {
+                throw new InvalidArgumentException('Geçersiz sayfa');
+            }
+            $page = $pageRepo->find($pageId);
+            if (!$page) {
+                throw new InvalidArgumentException('Sayfa bulunamadı');
+            }
+            echo json_encode(['data' => $page]);
+            break;
+        case 'create-page':
+            $page = $pageRepo->create([
+                'title' => $_POST['title'] ?? '',
+                'slug' => $_POST['slug'] ?? '',
+                'content' => $_POST['content'] ?? '',
+                'status' => $_POST['status'] ?? 'draft',
+            ]);
+            echo json_encode(['message' => 'Sayfa oluşturuldu', 'data' => $page]);
+            break;
+        case 'update-page':
+            $pageId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($pageId <= 0) {
+                throw new InvalidArgumentException('Geçersiz sayfa');
+            }
+            $page = $pageRepo->update($pageId, [
+                'title' => $_POST['title'] ?? null,
+                'slug' => $_POST['slug'] ?? null,
+                'content' => $_POST['content'] ?? null,
+                'status' => $_POST['status'] ?? null,
+            ]);
+            if (!$page) {
+                throw new InvalidArgumentException('Sayfa güncellenemedi');
+            }
+            echo json_encode(['message' => 'Sayfa güncellendi', 'data' => $page]);
+            break;
+        case 'delete-page':
+            $pageId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($pageId <= 0) {
+                throw new InvalidArgumentException('Geçersiz sayfa');
+            }
+            $pageRepo->delete($pageId);
+            echo json_encode(['message' => 'Sayfa silindi']);
+            break;
+        case 'recent-comments':
+            $comments = $interactionRepo->listRecentComments(10);
+            echo json_encode(['data' => $comments]);
             break;
         case 'list-users':
             $users = array_map(static function (array $user): array {

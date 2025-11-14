@@ -41,6 +41,81 @@ $(function () {
       });
   }
 
+  const sections = $('.admin-section');
+
+  function scrollToAnchor(container, anchor) {
+    if (!container.length) {
+      return;
+    }
+    const target = anchor ? container.find(anchor) : container;
+    const element = target.length ? target[0] : container[0];
+    setTimeout(() => {
+      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 100);
+  }
+
+  function setActiveSection(sectionName, anchor) {
+    if (!sectionName) {
+      return;
+    }
+
+    sections.removeClass('is-active');
+    const targetSection = sections.filter(`[data-section="${sectionName}"]`);
+    if (!targetSection.length) {
+      return;
+    }
+
+    targetSection.addClass('is-active');
+    scrollToAnchor(targetSection, anchor);
+  }
+
+  function activateMenuLink(link) {
+    $('.menu-link').removeClass('is-active');
+    link.addClass('is-active');
+    $('.menu-sub').removeClass('is-current');
+    const submenu = link.closest('.menu-sub');
+    if (submenu.length) {
+      submenu.addClass('is-current').addClass('is-open');
+      submenu.prev('.menu-parent').addClass('is-open');
+    }
+  }
+
+  $(document).on('click', '.menu-parent', function () {
+    const button = $(this);
+    const targetId = button.data('target');
+    const target = targetId ? $(`#${targetId}`) : $();
+    const nextState = !button.hasClass('is-open');
+    button.toggleClass('is-open', nextState);
+    if (target.length) {
+      target.toggleClass('is-open', nextState);
+    }
+  });
+
+  $(document).on('click', '.menu-link', function (event) {
+    event.preventDefault();
+    const link = $(this);
+    const section = link.data('section');
+    const anchor = link.data('anchor');
+    if (section) {
+      setActiveSection(section, anchor);
+      activateMenuLink(link);
+    }
+  });
+
+  $(document).on('click', '.js-section-link', function (event) {
+    event.preventDefault();
+    const link = $(this);
+    const section = link.data('section');
+    const anchor = link.data('anchor');
+    if (section) {
+      setActiveSection(section, anchor);
+      const matchingMenu = $(`.menu-link[data-section="${section}"]`).first();
+      if (matchingMenu.length) {
+        activateMenuLink(matchingMenu);
+      }
+    }
+  });
+
   $('#manga-form').on('submit', function (event) {
     event.preventDefault();
     const form = $(this);
@@ -118,6 +193,7 @@ $(function () {
     const status = config.status || '';
     const limit = config.limit || 6;
     const sort = config.sort || 'random';
+    const area = widget.area || 'main';
 
     let configFields = '';
 
@@ -188,11 +264,19 @@ $(function () {
           </div>
         </div>
         <div class="row g-3 mb-3">
-          <div class="col-md-6">
+          <div class="col-lg-4">
             <label class="form-label">Başlık</label>
             <input type="text" class="form-control" name="title" value="${widget.title}">
           </div>
-          <div class="col-md-6">
+          <div class="col-lg-4">
+            <label class="form-label">Alan</label>
+            <select class="form-select" name="area">
+              <option value="hero" ${area === 'hero' ? 'selected' : ''}>Hero Başlığı</option>
+              <option value="main" ${area === 'main' ? 'selected' : ''}>Ana İçerik</option>
+              <option value="sidebar" ${area === 'sidebar' ? 'selected' : ''}>Yan Panel</option>
+            </select>
+          </div>
+          <div class="col-lg-4">
             <label class="form-label">Sıra</label>
             <input type="number" class="form-control" name="sort_order" value="${sortOrder}">
           </div>
@@ -238,6 +322,7 @@ $(function () {
     const payload = {
       id: widgetId,
       title: form.find('input[name="title"]').val(),
+      area: form.find('select[name="area"]').val(),
       sort_order: form.find('input[name="sort_order"]').val(),
       enabled: form.find('input[name="enabled"]').is(':checked') ? 1 : 0,
       config: JSON.stringify(config),
@@ -260,6 +345,234 @@ $(function () {
 
   loadThemeSettings();
   loadWidgets();
+
+  function escapeHtml(value) {
+    return $('<div>').text(value ?? '').html();
+  }
+
+  function truncate(text, length) {
+    if (!text) return '';
+    if (text.length <= length) return text;
+    return `${text.substring(0, length - 1)}…`;
+  }
+
+  function formatDateTime(value) {
+    if (!value) return '';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return new Intl.DateTimeFormat('tr-TR', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  }
+
+  function renderCommentItem(comment) {
+    const initials = (comment.username || '?').charAt(0).toUpperCase();
+    const avatar = comment.avatar_url
+      ? `<img src="${comment.avatar_url}" alt="${escapeHtml(comment.username)}" class="comment-avatar">`
+      : `<div class="comment-avatar placeholder">${initials}</div>`;
+    const mangaLink = comment.manga_slug
+      ? `<a href="../public/manga.php?slug=${encodeURIComponent(comment.manga_slug)}" target="_blank" rel="noopener" class="comment-link"><i class="bi bi-book"></i> ${escapeHtml(comment.manga_title || 'Seri')}</a>`
+      : '';
+    const reactionSummary = comment.reaction_summary || {};
+    const reactionTotal = Object.values(reactionSummary).reduce((total, count) => total + Number(count || 0), 0);
+
+    return `
+      <article class="comment-card">
+        ${avatar}
+        <div class="comment-content">
+          <div class="comment-header">
+            <span class="comment-author">${escapeHtml(comment.username)}</span>
+            <span class="comment-date">${formatDateTime(comment.created_at)}</span>
+          </div>
+          <p class="comment-body">${escapeHtml(truncate(comment.body || '', 160))}</p>
+          <div class="comment-meta">
+            ${mangaLink}
+            <span class="comment-reactions"><i class="bi bi-hand-thumbs-up"></i> ${reactionTotal}</span>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function loadDashboardComments() {
+    const container = $('#dashboard-comments');
+    if (!container.length) {
+      return;
+    }
+    container.html('<div class="comment-empty text-muted">Yükleniyor...</div>');
+    $.getJSON('api.php', { action: 'recent-comments' })
+      .done(({ data }) => {
+        container.empty();
+        if (!data || !data.length) {
+          container.html('<div class="comment-empty text-muted">Henüz yorum yok.</div>');
+          return;
+        }
+        data.forEach((comment) => {
+          container.append(renderCommentItem(comment));
+        });
+      })
+      .fail(() => {
+        container.html('<div class="comment-empty text-danger">Yorumlar yüklenemedi.</div>');
+      });
+  }
+
+  $('#refresh-comments').on('click', function () {
+    loadDashboardComments();
+  });
+
+  loadDashboardComments();
+
+  const pageTableBody = $('#page-table tbody');
+  const pageForm = $('#page-form');
+  const pageMessage = $('#page-form-message');
+  const pageCancelButton = $('#page-cancel-edit');
+  let pageSearchTimer = null;
+
+  function formatStatusBadge(status) {
+    if (status === 'published') {
+      return '<span class="badge bg-success bg-opacity-75">Yayında</span>';
+    }
+    return '<span class="badge bg-secondary bg-opacity-50">Taslak</span>';
+  }
+
+  function renderPageRow(page) {
+    const updated = formatDateTime(page.updated_at || page.created_at);
+    const slug = escapeHtml(page.slug || '');
+    return `
+      <tr data-page-id="${page.id}">
+        <td>
+          <div class="fw-semibold">${escapeHtml(page.title)}</div>
+          <div class="small text-muted">${updated}</div>
+        </td>
+        <td>${formatStatusBadge(page.status)}</td>
+        <td><code>page.php?slug=${slug}</code></td>
+        <td class="text-end">
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-light page-edit">Düzenle</button>
+            <button type="button" class="btn btn-outline-danger page-delete">Sil</button>
+          </div>
+        </td>
+      </tr>`;
+  }
+
+  function loadPages() {
+    if (!pageTableBody.length) {
+      return;
+    }
+    const status = $('#page-status-filter').val();
+    const search = $('#page-search').val();
+    pageTableBody.html('<tr><td colspan="4" class="text-center text-muted">Yükleniyor...</td></tr>');
+    $.getJSON('api.php', { action: 'list-pages', status, search })
+      .done(({ data }) => {
+        pageTableBody.empty();
+        if (!data || !data.length) {
+          pageTableBody.html('<tr><td colspan="4" class="text-center text-muted">Henüz sayfa oluşturulmadı.</td></tr>');
+          return;
+        }
+        data.forEach((page) => {
+          pageTableBody.append(renderPageRow(page));
+        });
+      })
+      .fail(() => {
+        pageTableBody.html('<tr><td colspan="4" class="text-center text-danger">Sayfalar yüklenemedi.</td></tr>');
+      });
+  }
+
+  function resetPageForm() {
+    if (!pageForm.length) {
+      return;
+    }
+    pageForm[0].reset();
+    $('#page-id').val('');
+    pageMessage.empty();
+    pageCancelButton.addClass('d-none');
+    $('#page-form-hint').text('Yeni sayfalar yayınlandığında menülere ekleyebilirsiniz.');
+  }
+
+  function populatePageForm(page) {
+    $('#page-id').val(page.id);
+    $('#page-title').val(page.title || '');
+    $('#page-slug').val(page.slug || '');
+    $('#page-status').val(page.status || 'draft');
+    $('#page-content').val(page.content || '');
+    pageCancelButton.removeClass('d-none');
+    $('#page-form-hint').text('Güncellemeleri kaydedip değişiklikleri hemen yayınlayabilirsiniz.');
+    pageMessage.empty();
+    setActiveSection('pages');
+  }
+
+  pageForm.on('submit', function (event) {
+    event.preventDefault();
+    const formData = pageForm.serializeArray();
+    const id = $('#page-id').val();
+    const payload = {};
+    formData.forEach(({ name, value }) => {
+      payload[name] = value;
+    });
+    const action = id ? 'update-page' : 'create-page';
+    if (id) {
+      payload.id = id;
+    }
+    pageMessage.html('<div class="text-muted">Kaydediliyor...</div>');
+    $.post(`api.php?action=${action}`, payload)
+      .done((response) => {
+        pageMessage.html(`<div class="alert alert-success">${response.message}</div>`);
+        resetPageForm();
+        loadPages();
+      })
+      .fail((xhr) => {
+        handleError(xhr, pageMessage);
+      });
+  });
+
+  pageCancelButton.on('click', function () {
+    resetPageForm();
+  });
+
+  $('#page-status-filter').on('change', function () {
+    loadPages();
+  });
+
+  $('#page-search').on('input', function () {
+    clearTimeout(pageSearchTimer);
+    pageSearchTimer = setTimeout(() => {
+      loadPages();
+    }, 300);
+  });
+
+  $(document).on('click', '.page-edit', function () {
+    const row = $(this).closest('tr');
+    const pageId = row.data('page-id');
+    if (!pageId) {
+      return;
+    }
+    pageMessage.empty();
+    $.getJSON('api.php', { action: 'get-page', id: pageId })
+      .done(({ data }) => {
+        if (data) {
+          populatePageForm(data);
+        }
+      });
+  });
+
+  $(document).on('click', '.page-delete', function () {
+    const row = $(this).closest('tr');
+    const pageId = row.data('page-id');
+    if (!pageId) {
+      return;
+    }
+    if (!window.confirm('Bu sayfayı silmek istediğinize emin misiniz?')) {
+      return;
+    }
+    $.post('api.php?action=delete-page', { id: pageId })
+      .done((response) => {
+        pageMessage.html(`<div class="alert alert-success">${response.message}</div>`);
+        loadPages();
+      })
+      .fail((xhr) => handleError(xhr, pageMessage));
+  });
+
+  resetPageForm();
+  loadPages();
 
   function renderUserRow(user) {
     const initial = (user.username || '?').charAt(0).toUpperCase();
@@ -697,6 +1010,9 @@ $(function () {
       })
       .fail((xhr) => alert(xhr.responseJSON?.error || 'Menü silinemedi.'));
   });
+
+  activateMenuLink($(".menu-link[data-section='dashboard']").first());
+  setActiveSection('dashboard');
 
   loadUsers();
   loadFtpSettings();
