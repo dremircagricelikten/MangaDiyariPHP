@@ -41,6 +41,9 @@ $themeDefaults = [
 $theme = array_replace($themeDefaults, $allSettings);
 $footerText = trim((string) ($allSettings['site_footer'] ?? ''));
 $defaultFooter = '© ' . date('Y') . ' ' . $site['name'] . '. Tüm hakları saklıdır.';
+$kiSettings = [
+    'currency_name' => $allSettings['ki_currency_name'] ?? 'Ki',
+];
 
 $profile = $userRepo->findByUsername($username);
 $notFound = false;
@@ -78,6 +81,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       <?= $analytics['google'] ?>
     <?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="assets/styles.css">
     <style>
       :root {
@@ -89,41 +93,8 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       }
     </style>
   </head>
-  <body class="bg-dark text-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient">
-      <div class="container">
-        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-          <?php if (!empty($site['logo'])): ?>
-            <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
-          <?php endif; ?>
-          <span><?= htmlspecialchars($site['name']) ?></span>
-        </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarContent">
-          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
-            <?php if (!empty($primaryMenuItems)): ?>
-              <?php foreach ($primaryMenuItems as $item): ?>
-                <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
-              <?php endforeach; ?>
-            <?php endif; ?>
-            <?php if ($currentUser && in_array($currentUser['role'], ['admin', 'editor'], true)): ?>
-              <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
-            <?php endif; ?>
-            <?php if ($currentUser): ?>
-              <?php $memberProfileUrl = 'member.php?u=' . urlencode($currentUser['username']); ?>
-              <li class="nav-item"><a class="nav-link" href="profile.php">Profilim</a></li>
-              <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($memberProfileUrl) ?>">Kamu Profilim</a></li>
-              <li class="nav-item"><a class="nav-link" href="logout.php">Çıkış Yap</a></li>
-            <?php else: ?>
-              <li class="nav-item"><a class="nav-link" href="login.php">Giriş Yap</a></li>
-              <li class="nav-item"><a class="nav-link" href="register.php">Kayıt Ol</a></li>
-            <?php endif; ?>
-          </ul>
-        </div>
-      </div>
-    </nav>
+  <body class="site-body" data-theme="dark">
+    <?php $showSearchForm = false; $user = $currentUser; require __DIR__ . '/partials/site-navbar.php'; unset($user); ?>
 
     <?php if (!empty($ads['header'])): ?>
       <section class="ad-slot ad-slot--header py-3">
@@ -139,12 +110,12 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       <div class="row justify-content-center">
         <div class="col-lg-8">
           <?php if ($notFound): ?>
-            <div class="alert alert-dark border-light text-center py-5">
+            <div class="alert alert-secondary bg-opacity-25 border-0 text-center py-5 rounded-4">
               <h1 class="h4 mb-3">Üye bulunamadı</h1>
-              <p class="mb-0">Aradığınız üye mevcut değil veya hesabı devre dışı bırakılmış.</p>
+              <p class="mb-0 text-secondary">Aradığınız üye mevcut değil veya hesabı devre dışı bırakılmış.</p>
             </div>
           <?php else: ?>
-            <div class="card bg-secondary border-0 shadow-lg">
+            <article class="card bg-secondary border-0 shadow-lg rounded-4 overflow-hidden">
               <div class="card-body p-5">
                 <div class="d-flex flex-column flex-md-row align-items-center align-items-md-start gap-4">
                   <?php if (!empty($profile['avatar_url'])): ?>
@@ -155,13 +126,13 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                     </div>
                   <?php endif; ?>
                   <div class="flex-grow-1 text-center text-md-start">
-                    <h1 class="display-6 mb-1"><?= htmlspecialchars($profile['username']) ?></h1>
-                    <span class="badge bg-light text-dark mb-3"><?= htmlspecialchars($roleLabel) ?></span>
+                    <span class="badge rounded-pill bg-gradient mb-3 px-3 py-2 text-uppercase"><?= htmlspecialchars($roleLabel) ?></span>
+                    <h1 class="display-6 mb-2"><?= htmlspecialchars($profile['username']) ?></h1>
                     <?php if (!empty($profile['website_url'])): ?>
                       <p class="mb-2"><a href="<?= htmlspecialchars($profile['website_url']) ?>" class="link-light" target="_blank" rel="noopener">Web Sitesi</a></p>
                     <?php endif; ?>
                     <?php if ($joinDateFormatted): ?>
-                      <p class="text-muted small mb-2">Üyelik tarihi: <?= htmlspecialchars($joinDateFormatted) ?></p>
+                      <p class="text-muted small mb-0">Üyelik tarihi: <?= htmlspecialchars($joinDateFormatted) ?></p>
                     <?php endif; ?>
                   </div>
                 </div>
@@ -171,15 +142,17 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                     <h2 class="h5 mb-3">Hakkında</h2>
                     <p class="mb-0"><?= nl2br(htmlspecialchars($profile['bio'])) ?></p>
                   </div>
+                <?php else: ?>
+                  <p class="text-secondary small mb-0 mt-4">Bu üye henüz bir biyografi eklemedi.</p>
                 <?php endif; ?>
               </div>
-            </div>
+            </article>
           <?php endif; ?>
         </div>
       </div>
     </main>
 
-    <footer class="py-4 bg-black text-secondary">
+    <footer class="site-footer py-4">
       <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
         <small><?= $footerText !== '' ? $footerText : htmlspecialchars($defaultFooter) ?></small>
         <?php if (!empty($footerMenuItems)): ?>
@@ -200,5 +173,6 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/theme.js"></script>
   </body>
 </html>

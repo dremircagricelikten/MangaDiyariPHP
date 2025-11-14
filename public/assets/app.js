@@ -2,39 +2,10 @@ $(function () {
   const widgets = window.appWidgets || {};
   const popularWidget = widgets.popular_slider || null;
   const latestWidget = widgets.latest_updates || null;
-  const themeStorageKey = 'md-theme-preference';
 
-  const body = $('body');
-  const themeToggle = $('#theme-toggle');
-
-  function applyTheme(theme) {
-    const nextTheme = theme === 'light' ? 'light' : 'dark';
-    body.attr('data-theme', nextTheme);
-    const icon = nextTheme === 'dark' ? 'bi-moon-stars' : 'bi-sun-fill';
-    const label = nextTheme === 'dark' ? 'Açık tema' : 'Koyu tema';
-    themeToggle.attr('aria-label', `Temayı değiştir (${label})`);
-    themeToggle.find('i').attr('class', `bi ${icon}`);
+  function escapeHtml(value) {
+    return $('<div>').text(value ?? '').html();
   }
-
-  function detectInitialTheme() {
-    const stored = localStorage.getItem(themeStorageKey);
-    if (stored === 'light' || stored === 'dark') {
-      return stored;
-    }
-    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
-      return 'light';
-    }
-    return 'dark';
-  }
-
-  applyTheme(detectInitialTheme());
-
-  themeToggle.on('click', function () {
-    const current = body.attr('data-theme') === 'light' ? 'light' : 'dark';
-    const next = current === 'light' ? 'dark' : 'light';
-    localStorage.setItem(themeStorageKey, next);
-    applyTheme(next);
-  });
 
   function truncate(text, length) {
     if (!text) {
@@ -368,6 +339,115 @@ $(function () {
     loadLatest();
   }
 
+  function renderTopReadsList(container, items, type) {
+    container.empty();
+
+    if (!items.length) {
+      container.append('<li class="top-reads-empty">Henüz veri bulunmuyor.</li>');
+      return;
+    }
+
+    items.forEach((item, index) => {
+      if (type === 'manga') {
+        const cover = item.cover_image || 'https://placehold.co/120x160?text=Manga';
+        const url = `manga.php?slug=${encodeURIComponent(item.slug)}`;
+        container.append(`
+          <li class="top-reads-item">
+            <span class="top-reads-rank">${index + 1}</span>
+            <a class="top-reads-cover" href="${url}" style="background-image:url('${cover}')">
+              <span class="visually-hidden">${escapeHtml(item.title)}</span>
+            </a>
+            <div class="top-reads-content">
+              <a class="top-reads-title" href="${url}">${escapeHtml(item.title)}</a>
+              <div class="top-reads-meta">
+                <span><i class="bi bi-eye"></i> ${item.total_reads}</span>
+                <span>${formatStatus(item.status)}</span>
+              </div>
+            </div>
+          </li>`);
+      } else {
+        const chapterUrl = `chapter.php?slug=${encodeURIComponent(item.manga_slug)}&chapter=${encodeURIComponent(item.number)}`;
+        const mangaUrl = `manga.php?slug=${encodeURIComponent(item.manga_slug)}`;
+        const chapterTitle = item.title ? escapeHtml(item.title) : `Bölüm ${item.number}`;
+        container.append(`
+          <li class="top-reads-item">
+            <span class="top-reads-rank">${index + 1}</span>
+            <a class="top-reads-cover" href="${chapterUrl}" style="background-image:url('${item.cover_image || 'https://placehold.co/120x160?text=Chapter'}')">
+              <span class="visually-hidden">${chapterTitle}</span>
+            </a>
+            <div class="top-reads-content">
+              <a class="top-reads-title" href="${chapterUrl}">${chapterTitle}</a>
+              <div class="top-reads-meta">
+                <a class="top-reads-link" href="${mangaUrl}">${escapeHtml(item.manga_title)}</a>
+                <span>Bölüm ${item.number}</span>
+                <span><i class="bi bi-eye"></i> ${item.total_reads}</span>
+              </div>
+            </div>
+          </li>`);
+      }
+    });
+  }
+
+  function initTopReads() {
+    const widget = $('[data-widget="top-reads"]');
+    if (!widget.length) {
+      return;
+    }
+
+    const buttons = widget.find('[data-range]');
+    const mangaList = widget.find('[data-top-reads="manga"]');
+    const chapterList = widget.find('[data-top-reads="chapters"]');
+    const statusLabel = widget.find('[data-top-reads-status]');
+    const rangeLabels = {
+      daily: 'Son 24 saat',
+      weekly: 'Son 7 gün',
+      monthly: 'Son 30 gün',
+    };
+
+    function setLoading() {
+      const placeholder = '<li class="top-reads-empty">Yükleniyor...</li>';
+      mangaList.html(placeholder);
+      chapterList.html(placeholder);
+    }
+
+    function showError(message) {
+      const markup = `<li class="top-reads-empty text-warning">${escapeHtml(message)}</li>`;
+      mangaList.html(markup);
+      chapterList.html(markup);
+    }
+
+    function fetchRange(range) {
+      setLoading();
+      $.getJSON('api.php', { action: 'top-reads', range, limit: 5 })
+        .done(({ data }) => {
+          const payload = data || {};
+          renderTopReadsList(mangaList, payload.mangas || [], 'manga');
+          renderTopReadsList(chapterList, payload.chapters || [], 'chapters');
+          statusLabel.text(rangeLabels[range] || rangeLabels.weekly);
+        })
+        .fail((xhr) => {
+          const response = xhr.responseJSON;
+          showError(response?.error || 'Veriler alınamadı.');
+        });
+    }
+
+    buttons.on('click', function () {
+      const button = $(this);
+      const range = button.data('range');
+      if (!range || button.hasClass('active')) {
+        return;
+      }
+      buttons.removeClass('active');
+      button.addClass('active');
+      fetchRange(range);
+    });
+
+    const initialButton = buttons.filter('.active').first();
+    const initialRange = initialButton.data('range') || 'weekly';
+    statusLabel.text(rangeLabels[initialRange] || rangeLabels.weekly);
+    fetchRange(initialRange);
+  }
+
   $('#search-form').on('submit', function (event) {
     event.preventDefault();
     loadMangaList({ search: $('#search').val(), status: $('#status').val() });
@@ -382,4 +462,6 @@ $(function () {
   if (latestWidget) {
     initLatest(latestWidget);
   }
+
+  initTopReads();
 });

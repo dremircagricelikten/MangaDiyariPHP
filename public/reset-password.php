@@ -3,12 +3,14 @@ require_once __DIR__ . '/../src/Auth.php';
 require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/UserRepository.php';
 require_once __DIR__ . '/../src/SettingRepository.php';
+require_once __DIR__ . '/../src/PasswordResetRepository.php';
 require_once __DIR__ . '/../src/SiteContext.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
 use MangaDiyari\Core\UserRepository;
 use MangaDiyari\Core\SettingRepository;
+use MangaDiyari\Core\PasswordResetRepository;
 use MangaDiyari\Core\SiteContext;
 
 Auth::start();
@@ -17,17 +19,17 @@ if (Auth::check()) {
     exit;
 }
 
+$token = $_GET['token'] ?? ($_POST['token'] ?? '');
+$token = is_string($token) ? trim($token) : '';
+
 $context = SiteContext::build();
 $site = $context['site'];
 $analytics = $context['analytics'];
 
-$error = null;
-$registrationSuccess = isset($_GET['registered']);
-$resetSuccess = isset($_GET['reset']);
-
 $pdo = Database::getConnection();
 $users = new UserRepository($pdo);
 $settingRepo = new SettingRepository($pdo);
+$resetRepo = new PasswordResetRepository($pdo);
 $themeDefaults = [
     'primary_color' => '#5f2c82',
     'accent_color' => '#49a09d',
@@ -37,32 +39,32 @@ $themeDefaults = [
 ];
 $theme = array_replace($themeDefaults, $settingRepo->all());
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    $login = trim($_POST['login'] ?? '');
+$error = null;
+$success = false;
+$record = null;
+
+if ($token !== '') {
+    $record = $resetRepo->findValidToken($token);
+    if (!$record) {
+        $error = 'Şifre sıfırlama bağlantısı geçersiz veya süresi dolmuş.';
+    }
+} else {
+    $error = 'Şifre sıfırlama bağlantısı eksik.';
+}
+
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && $record) {
     $password = $_POST['password'] ?? '';
+    $confirm = $_POST['password_confirmation'] ?? '';
 
-    if ($login === '' || $password === '') {
-        $error = 'Lütfen tüm alanları doldurun.';
+    if ($password === '' || strlen($password) < 6) {
+        $error = 'Parola en az 6 karakter olmalıdır.';
+    } elseif ($password !== $confirm) {
+        $error = 'Parolalar uyuşmuyor.';
     } else {
-        $user = $users->verifyCredentials($login, $password);
-
-        if (!$user) {
-            $existing = filter_var($login, FILTER_VALIDATE_EMAIL)
-                ? $users->findByEmail($login)
-                : $users->findByUsername($login);
-
-            if ($existing && isset($existing['is_active']) && (int) $existing['is_active'] === 0) {
-                $error = 'Hesabınız pasif durumdadır. Lütfen yöneticiyle iletişime geçin.';
-            } else {
-                $error = 'Giriş bilgileri hatalı.';
-            }
-        } else {
-            unset($user['password_hash']);
-            Auth::login($user);
-            $redirect = $_GET['redirect'] ?? 'index.php';
-            header('Location: ' . $redirect);
-            exit;
-        }
+        $users->updatePassword((int) $record['user_id'], $password);
+        $resetRepo->deleteByToken($token);
+        header('Location: login.php?reset=1');
+        exit;
     }
 }
 ?>
@@ -71,7 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title><?= htmlspecialchars($site['name']) ?> - Üye Girişi</title>
+    <title><?= htmlspecialchars($site['name']) ?> - Şifre Sıfırlama</title>
     <?php if (!empty($analytics['search_console'])): ?>
       <?= $analytics['search_console'] ?>
     <?php endif; ?>
@@ -103,36 +105,31 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       </div>
       <div class="card auth-card border-0">
         <div class="card-body">
-              <h1 class="h4 text-center mb-4">Üye Girişi</h1>
-              <?php if ($registrationSuccess): ?>
-                <div class="alert alert-success">Kayıt işlemi tamamlandı. Şimdi giriş yapabilirsiniz.</div>
-              <?php endif; ?>
-              <?php if ($resetSuccess): ?>
-                <div class="alert alert-success">Parolanız güncellendi. Lütfen giriş yapın.</div>
-              <?php endif; ?>
-              <?php if ($error): ?>
-                <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
-              <?php endif; ?>
-              <form method="post" autocomplete="off">
-                <div class="mb-3">
-                  <label class="form-label">Kullanıcı adı veya E-posta</label>
-                  <input type="text" name="login" class="form-control" required value="<?= htmlspecialchars($_POST['login'] ?? '') ?>">
-                </div>
-                <div class="mb-3">
-                  <label class="form-label">Parola</label>
-                  <input type="password" name="password" class="form-control" required>
-                </div>
-                <button type="submit" class="btn btn-primary w-100">Giriş Yap</button>
-              </form>
-              <div class="mt-3 text-center">
-                <a href="register.php" class="link-light small">Hesabınız yok mu? Kayıt olun.</a>
+          <h1 class="h4 text-center mb-4">Şifreyi Sıfırla</h1>
+          <?php if ($error): ?>
+            <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
+          <?php endif; ?>
+          <?php if ($record): ?>
+            <form method="post" autocomplete="off">
+              <input type="hidden" name="token" value="<?= htmlspecialchars($token) ?>">
+              <div class="mb-3">
+                <label class="form-label">Yeni Parola</label>
+                <input type="password" name="password" class="form-control" required minlength="6">
               </div>
-              <div class="mt-2 text-center">
-                <a href="forgot-password.php" class="link-light small">Şifremi unuttum</a>
+              <div class="mb-3">
+                <label class="form-label">Parolayı Doğrula</label>
+                <input type="password" name="password_confirmation" class="form-control" required minlength="6">
               </div>
-              <div class="mt-2 text-center">
-                <a href="index.php" class="link-light small">Ana sayfaya dön</a>
-              </div>
+              <button type="submit" class="btn btn-primary w-100">Parolayı Güncelle</button>
+            </form>
+          <?php else: ?>
+            <div class="text-center">
+              <a href="forgot-password.php" class="btn btn-outline-light">Yeni bağlantı iste</a>
+            </div>
+          <?php endif; ?>
+          <div class="mt-3 text-center">
+            <a href="login.php" class="link-light small">Giriş sayfasına dön</a>
+          </div>
         </div>
       </div>
     </div>

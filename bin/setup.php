@@ -89,6 +89,24 @@ $pdo->exec('CREATE TABLE IF NOT EXISTS widgets (
     config TEXT NOT NULL DEFAULT "{}"
 )');
 
+$pdo->exec('CREATE TABLE IF NOT EXISTS chapter_reads (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chapter_id INTEGER NOT NULL,
+    manga_id INTEGER NOT NULL,
+    user_id INTEGER,
+    ip_address TEXT,
+    user_agent TEXT,
+    read_at TEXT NOT NULL
+)');
+
+$pdo->exec('CREATE TABLE IF NOT EXISTS password_resets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    created_at TEXT NOT NULL,
+    expires_at TEXT NOT NULL
+)');
+
 $config = require __DIR__ . '/../config.php';
 $adminEmail = $config['admin']['email'] ?? 'admin@example.com';
 $adminPassword = $config['admin']['password'] ?? 'changeme';

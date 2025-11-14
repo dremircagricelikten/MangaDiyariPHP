@@ -64,44 +64,8 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       }
     </style>
   </head>
-  <body class="bg-dark text-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient">
-      <div class="container">
-        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-          <?php if (!empty($site['logo'])): ?>
-            <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
-          <?php endif; ?>
-          <span><?= htmlspecialchars($site['name']) ?></span>
-        </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarContent">
-          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
-            <?php if (!empty($primaryMenuItems)): ?>
-              <?php foreach ($primaryMenuItems as $item): ?>
-                <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
-              <?php endforeach; ?>
-            <?php endif; ?>
-            <?php if ($user): ?>
-              <li class="nav-item"><span class="nav-link">Bakiye: <strong id="nav-ki-balance"><?= (int) ($user['ki_balance'] ?? 0) ?></strong> <?= htmlspecialchars($kiSettings['currency_name']) ?></span></li>
-            <?php endif; ?>
-            <?php if ($user && in_array($user['role'], ['admin', 'editor'], true)): ?>
-              <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
-            <?php endif; ?>
-            <?php if ($user): ?>
-              <?php $memberProfileUrl = 'member.php?u=' . urlencode($user['username']); ?>
-              <li class="nav-item"><a class="nav-link" href="profile.php">Profilim</a></li>
-              <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($memberProfileUrl) ?>">Kamu Profili</a></li>
-              <li class="nav-item"><a class="nav-link" href="logout.php">Çıkış Yap</a></li>
-            <?php else: ?>
-              <li class="nav-item"><a class="nav-link" href="login.php">Giriş Yap</a></li>
-              <li class="nav-item"><a class="nav-link" href="register.php">Kayıt Ol</a></li>
-            <?php endif; ?>
-          </ul>
-        </div>
-      </div>
-    </nav>
+  <body class="site-body" data-theme="dark">
+    <?php $showSearchForm = false; require __DIR__ . '/partials/site-navbar.php'; ?>
 
     <?php if (!empty($ads['header'])): ?>
       <section class="ad-slot ad-slot--header py-3">
@@ -200,6 +164,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       ] : null, JSON_UNESCAPED_UNICODE) ?>;
       window.kiSettings = <?= json_encode($kiSettings, JSON_UNESCAPED_UNICODE) ?>;
     </script>
+    <script src="assets/theme.js"></script>
     <script src="assets/chat.js"></script>
     <script src="assets/manga.js"></script>
   </body>

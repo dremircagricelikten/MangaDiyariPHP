@@ -247,6 +247,43 @@ class UserRepository
         return $updated;
     }
 
+    public function updatePassword(int $id, string $password): void
+    {
+        if ($password === '') {
+            throw new InvalidArgumentException('Parola boş olamaz.');
+        }
+
+        $user = $this->findById($id);
+        if (!$user) {
+            throw new InvalidArgumentException('Kullanıcı bulunamadı.');
+        }
+
+        $now = new DateTimeImmutable();
+        $stmt = $this->pdo->prepare('UPDATE users SET password_hash = :password, updated_at = :updated WHERE id = :id');
+        $stmt->execute([
+            ':password' => password_hash($password, PASSWORD_DEFAULT),
+            ':updated' => $now->format('Y-m-d H:i:s'),
+            ':id' => $id,
+        ]);
+    }
+
+    /**
+     * @return array<int, array{id:int,email:string,username:string}>
+     */
+    public function listActiveUsers(): array
+    {
+        $stmt = $this->pdo->query('SELECT id, username, email FROM users WHERE is_active = 1');
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return array_map(static function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'username' => $row['username'],
+                'email' => $row['email'],
+            ];
+        }, $rows);
+    }
+
     public function count(array $filters = []): int
     {
         $query = 'SELECT COUNT(*) FROM users';

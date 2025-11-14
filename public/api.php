@@ -13,6 +13,7 @@ require_once __DIR__ . '/../src/WidgetRepository.php';
 require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/KiRepository.php';
 require_once __DIR__ . '/../src/InteractionRepository.php';
+require_once __DIR__ . '/../src/ReadingAnalyticsRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
@@ -22,6 +23,7 @@ use MangaDiyari\Core\WidgetRepository;
 use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\KiRepository;
 use MangaDiyari\Core\InteractionRepository;
+use MangaDiyari\Core\ReadingAnalyticsRepository;
 
 try {
     $pdo = Database::getConnection();
@@ -31,6 +33,7 @@ try {
     $settingRepo = new SettingRepository($pdo);
     $kiRepo = new KiRepository($pdo);
     $interactionRepo = new InteractionRepository($pdo);
+    $readingRepo = new ReadingAnalyticsRepository($pdo);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
@@ -111,6 +114,7 @@ try {
             }
             $prev = $chapterRepo->getPreviousChapter((int) $manga['id'], (float) $chapter['number']);
             $next = $chapterRepo->getNextChapter((int) $manga['id'], (float) $chapter['number']);
+            $readingRepo->recordChapterRead((int) $chapter['id'], (int) $manga['id'], $currentUserId, $_SERVER['REMOTE_ADDR'] ?? null, $_SERVER['HTTP_USER_AGENT'] ?? null);
             echo json_encode([
                 'data' => $chapter,
                 'manga' => $manga,
@@ -118,6 +122,18 @@ try {
                 'next' => $next,
                 'access' => $access,
             ]);
+            break;
+        case 'top-reads':
+            $range = $_GET['range'] ?? 'weekly';
+            $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 5;
+            $limit = $limit > 0 ? $limit : 5;
+            $chapters = $readingRepo->getTopChapters($range, $limit);
+            $mangas = $readingRepo->getTopManga($range, $limit);
+            echo json_encode(['data' => [
+                'range' => $range,
+                'chapters' => $chapters,
+                'mangas' => $mangas,
+            ]]);
             break;
         case 'latest-chapters':
             $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 8;

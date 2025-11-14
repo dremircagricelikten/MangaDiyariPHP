@@ -284,6 +284,32 @@ class Database
             updated_at DATETIME NOT NULL,
             CONSTRAINT fk_menu_items_menu FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_reads (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            chapter_id INT UNSIGNED NOT NULL,
+            manga_id INT UNSIGNED NOT NULL,
+            user_id INT UNSIGNED NULL,
+            ip_address VARCHAR(64) NULL,
+            user_agent TEXT NULL,
+            read_at DATETIME NOT NULL,
+            INDEX idx_reads_chapter (chapter_id),
+            INDEX idx_reads_manga (manga_id),
+            INDEX idx_reads_user (user_id),
+            INDEX idx_reads_read_at (read_at),
+            CONSTRAINT fk_reads_chapter FOREIGN KEY (chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+            CONSTRAINT fk_reads_manga FOREIGN KEY (manga_id) REFERENCES mangas(id) ON DELETE CASCADE,
+            CONSTRAINT fk_reads_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS password_resets (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            token_hash VARCHAR(191) NOT NULL,
+            created_at DATETIME NOT NULL,
+            expires_at DATETIME NOT NULL,
+            UNIQUE KEY uniq_reset_token (token_hash),
+            INDEX idx_reset_user (user_id),
+            CONSTRAINT fk_reset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
         self::ensureColumn($pdo, 'mysql', 'users', 'bio', 'TEXT NULL');
         self::ensureColumn($pdo, 'mysql', 'users', 'avatar_url', 'TEXT NULL');
         self::ensureColumn($pdo, 'mysql', 'users', 'website_url', 'TEXT NULL');
@@ -292,6 +318,7 @@ class Database
         self::ensureColumn($pdo, 'mysql', 'chapters', 'ki_cost', 'INT UNSIGNED NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'mysql', 'chapters', 'premium_expires_at', 'DATETIME NULL');
         self::ensureColumn($pdo, 'mysql', 'widgets', 'area', "VARCHAR(64) NOT NULL DEFAULT 'main'");
+        self::ensureColumn($pdo, 'mysql', 'chapters', 'assets', 'LONGTEXT NULL');
 
         $pdo->exec("UPDATE widgets SET area = 'main' WHERE area IS NULL OR area = ''");
     }
@@ -456,6 +483,26 @@ class Database
             updated_at TEXT NOT NULL,
             FOREIGN KEY(menu_id) REFERENCES menus(id) ON DELETE CASCADE
         )');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_reads (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            chapter_id INTEGER NOT NULL,
+            manga_id INTEGER NOT NULL,
+            user_id INTEGER,
+            ip_address TEXT,
+            user_agent TEXT,
+            read_at TEXT NOT NULL,
+            FOREIGN KEY(chapter_id) REFERENCES chapters(id) ON DELETE CASCADE,
+            FOREIGN KEY(manga_id) REFERENCES mangas(id) ON DELETE CASCADE,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
+        )');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS password_resets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            token_hash TEXT NOT NULL UNIQUE,
+            created_at TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )');
         self::ensureColumn($pdo, 'sqlite', 'users', 'bio', 'TEXT');
         self::ensureColumn($pdo, 'sqlite', 'users', 'avatar_url', 'TEXT');
         self::ensureColumn($pdo, 'sqlite', 'users', 'website_url', 'TEXT');
@@ -463,6 +510,7 @@ class Database
         self::ensureColumn($pdo, 'sqlite', 'users', 'ki_balance', 'INTEGER NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'sqlite', 'chapters', 'ki_cost', 'INTEGER NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'sqlite', 'chapters', 'premium_expires_at', 'TEXT');
+        self::ensureColumn($pdo, 'sqlite', 'chapters', 'assets', 'TEXT');
         self::ensureColumn($pdo, 'sqlite', 'widgets', 'area', "TEXT NOT NULL DEFAULT 'main'");
 
         $pdo->exec("UPDATE widgets SET area = 'main' WHERE area IS NULL OR area = ''");

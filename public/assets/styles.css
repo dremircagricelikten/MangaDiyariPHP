@@ -30,6 +30,7 @@ body,
   color: rgba(255, 255, 255, 0.75);
   border-radius: 999px;
   padding-inline: 1rem;
+  transition: color 0.3s ease, background 0.3s ease, transform 0.3s ease;
 }
 
 .navbar .nav-link:hover,
@@ -37,6 +38,19 @@ body,
 .navbar .nav-link.active {
   color: #fff;
   background: rgba(255, 255, 255, 0.12);
+  transform: translateY(-1px);
+}
+
+.navbar-toggler {
+  border-radius: 0.85rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition: border-color 0.3s ease, background 0.3s ease;
+}
+
+.navbar-toggler:focus,
+.navbar-toggler:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .navbar-search {
@@ -80,6 +94,60 @@ body,
   justify-content: center;
   width: 36px;
   height: 36px;
+  transition: transform 0.3s ease, background 0.3s ease;
+}
+
+.btn-theme-toggle:hover,
+.btn-theme-toggle:focus {
+  transform: translateY(-1px);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.badge.bg-gradient {
+  background: linear-gradient(135deg, var(--gradient-start), var(--gradient-end));
+  color: #fff;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+}
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1rem;
+}
+
+.auth-shell {
+  width: min(420px, 100%);
+  margin-inline: auto;
+}
+
+.auth-brand {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.auth-brand .navbar-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: inherit;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.auth-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 1.5rem;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+}
+
+.auth-card .card-body {
+  padding: 2.25rem;
 }
 
 .landing-hero {
@@ -136,6 +204,21 @@ body,
   padding: 1.5rem;
 }
 
+.top-reads-widget {
+  backdrop-filter: blur(10px);
+  position: relative;
+  overflow: hidden;
+}
+
+.top-reads-widget::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 -40% 0;
+  height: 160px;
+  background: radial-gradient(circle at 50% 20%, rgba(255, 255, 255, 0.12), transparent 65%);
+  pointer-events: none;
+}
+
 .sidebar-widget__header {
   display: flex;
   align-items: center;
@@ -148,9 +231,137 @@ body,
   font-size: 1.15rem;
 }
 
+.top-reads-switch .btn {
+  border-radius: 999px;
+  padding-inline: 0.75rem;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.top-reads-switch .btn.active,
+.top-reads-switch .btn:hover,
+.top-reads-switch .btn:focus {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.18);
+  border-color: transparent;
+}
+
 .sidebar-list {
   display: grid;
   gap: 1rem;
+}
+
+.top-reads-content {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.top-reads-group__title {
+  font-size: 0.85rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+  margin-bottom: 0.75rem;
+}
+
+.top-reads-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.85rem;
+}
+
+.top-reads-item {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.65rem 0.75rem;
+  border-radius: 1rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
+}
+
+.top-reads-item:hover,
+.top-reads-item:focus-within {
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.top-reads-rank {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.top-reads-cover {
+  width: 52px;
+  aspect-ratio: 2 / 3;
+  border-radius: 0.75rem;
+  background-size: cover;
+  background-position: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.top-reads-content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.top-reads-title {
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-block;
+  transition: color 0.25s ease;
+}
+
+.top-reads-title:hover,
+.top-reads-title:focus {
+  color: #fff;
+}
+
+.top-reads-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.top-reads-meta .bi {
+  opacity: 0.7;
+}
+
+.top-reads-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.top-reads-link:hover,
+.top-reads-link:focus {
+  color: #fff;
+  text-decoration: underline;
+}
+
+.top-reads-empty {
+  padding: 0.75rem 1rem;
+  border-radius: 0.85rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.7);
+  margin: 0;
 }
 
 .sidebar-item {
@@ -843,6 +1054,54 @@ body[data-theme='light'] .ad-slot {
   border-color: rgba(148, 163, 184, 0.28);
   color: #0f172a;
   box-shadow: 0 24px 42px rgba(15, 23, 42, 0.06);
+}
+
+body[data-theme='light'] .top-reads-switch .btn {
+  color: rgba(15, 23, 42, 0.65);
+  border-color: rgba(148, 163, 184, 0.45);
+}
+
+body[data-theme='light'] .top-reads-switch .btn.active,
+body[data-theme='light'] .top-reads-switch .btn:hover,
+body[data-theme='light'] .top-reads-switch .btn:focus {
+  color: #0f172a;
+  background: rgba(79, 70, 229, 0.12);
+  border-color: rgba(79, 70, 229, 0.3);
+}
+
+body[data-theme='light'] .top-reads-item {
+  background: rgba(255, 255, 255, 0.95);
+  border-color: rgba(148, 163, 184, 0.32);
+}
+
+body[data-theme='light'] .top-reads-item:hover,
+body[data-theme='light'] .top-reads-item:focus-within {
+  background: rgba(226, 232, 240, 0.85);
+  border-color: rgba(79, 70, 229, 0.35);
+}
+
+body[data-theme='light'] .top-reads-rank {
+  background: rgba(79, 70, 229, 0.12);
+  color: rgba(15, 23, 42, 0.8);
+}
+
+body[data-theme='light'] .top-reads-meta {
+  color: rgba(15, 23, 42, 0.55);
+}
+
+body[data-theme='light'] .top-reads-empty {
+  background: rgba(226, 232, 240, 0.65);
+  color: rgba(15, 23, 42, 0.6);
+}
+
+body[data-theme='light'] .auth-card {
+  background: rgba(255, 255, 255, 0.96);
+  border-color: rgba(148, 163, 184, 0.32);
+  box-shadow: 0 28px 50px rgba(15, 23, 42, 0.08);
+}
+
+body[data-theme='light'] .auth-brand .navbar-brand {
+  color: #0f172a;
 }
 
 body[data-theme='light'] .sidebar-item:hover,

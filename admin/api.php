@@ -19,6 +19,7 @@ require_once __DIR__ . '/../src/MenuRepository.php';
 require_once __DIR__ . '/../src/KiRepository.php';
 require_once __DIR__ . '/../src/PageRepository.php';
 require_once __DIR__ . '/../src/InteractionRepository.php';
+require_once __DIR__ . '/../src/Mailer.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
@@ -32,6 +33,7 @@ use MangaDiyari\Core\KiRepository;
 use MangaDiyari\Core\PageRepository;
 use MangaDiyari\Core\InteractionRepository;
 use MangaDiyari\Core\Slugger;
+use MangaDiyari\Core\Mailer;
 
 Auth::start();
 if (!Auth::checkRole(['admin', 'editor'])) {
@@ -185,7 +187,22 @@ try {
                 ]) ?? $chapter;
             }
 
-            echo json_encode(['message' => 'Bölüm başarıyla oluşturuldu', 'chapter' => $chapter]);
+            $mailSummary = null;
+            $manga = $mangaRepo->findById($mangaId);
+            if ($manga) {
+                try {
+                    $mailSummary = notifyChapterPublished($settingRepo, $userRepo, $chapter, $manga);
+                } catch (Throwable $mailError) {
+                    $mailSummary = ['error' => $mailError->getMessage()];
+                }
+            }
+
+            $response = ['message' => 'Bölüm başarıyla oluşturuldu', 'chapter' => $chapter];
+            if ($mailSummary) {
+                $response['mail'] = $mailSummary;
+            }
+
+            echo json_encode($response);
             break;
         case 'list-chapters':
             $mangaId = isset($_GET['manga_id']) ? (int) $_GET['manga_id'] : 0;
@@ -277,6 +294,7 @@ try {
             }
 
             $created = [];
+            $mailSummary = ['total_sent' => 0, 'chapters' => []];
             foreach ($bundle as $folder => $assets) {
                 $chapterNumber = $folder;
                 if ($chapterRepo->findByMangaAndNumber($mangaId, $chapterNumber)) {
@@ -295,9 +313,27 @@ try {
                 $paths = persistChapterAssets($chapter['id'], $chapterNumber, $assets, $storageOptions);
                 $chapter = $chapterRepo->update($chapter['id'], ['assets' => $paths]) ?? $chapter;
                 $created[] = $chapter;
+
+                $manga = $mangaRepo->findById($mangaId);
+                if ($manga) {
+                    try {
+                        $result = notifyChapterPublished($settingRepo, $userRepo, $chapter, $manga);
+                        if ($result) {
+                            $mailSummary['total_sent'] += (int) ($result['sent'] ?? 0);
+                            $mailSummary['chapters'][] = ['number' => $chapterNumber, 'result' => $result];
+                        }
+                    } catch (Throwable $mailError) {
+                        $mailSummary['chapters'][] = ['number' => $chapterNumber, 'error' => $mailError->getMessage()];
+                    }
+                }
             }
 
-            echo json_encode(['message' => 'Toplu yükleme tamamlandı', 'created' => $created]);
+            $response = ['message' => 'Toplu yükleme tamamlandı', 'created' => $created];
+            if (!empty($mailSummary['chapters'])) {
+                $response['mail'] = $mailSummary;
+            }
+
+            echo json_encode($response);
             break;
         case 'get-ki-settings':
             $settings = $settingRepo->all();
@@ -375,6 +411,7 @@ try {
                 'site_tagline' => 'site_tagline',
                 'chapter_storage_driver' => 'chapter_storage_driver',
                 'site_footer' => 'site_footer',
+                'site_base_url' => 'site_base_url',
             ];
             foreach ($siteFields as $input => $key) {
                 if (!isset($_POST[$input])) {
@@ -383,6 +420,9 @@ try {
                 $value = trim((string) $_POST[$input]);
                 if ($input === 'chapter_storage_driver' && !in_array($value, ['local', 'ftp'], true)) {
                     $value = 'local';
+                }
+                if ($input === 'site_base_url') {
+                    $value = $value !== '' ? rtrim($value, '/') : '';
                 }
                 $settingRepo->set($key, $value);
                 $updates[$key] = $value;
@@ -422,6 +462,62 @@ try {
             }
 
             echo json_encode(['message' => 'Depolama ayarları güncellendi', 'data' => $updates]);
+            break;
+        case 'update-smtp-settings':
+            $enabled = isset($_POST['smtp_enabled']) && $_POST['smtp_enabled'] === '1' ? '1' : '0';
+            $settingRepo->set('smtp_enabled', $enabled);
+
+            $host = trim((string) ($_POST['smtp_host'] ?? ''));
+            $settingRepo->set('smtp_host', $host);
+
+            $port = isset($_POST['smtp_port']) ? (int) $_POST['smtp_port'] : 587;
+            if ($port <= 0) {
+                $port = 587;
+            }
+            $settingRepo->set('smtp_port', (string) $port);
+
+            $encryption = strtolower(trim((string) ($_POST['smtp_encryption'] ?? '')));
+            if (!in_array($encryption, ['ssl', 'tls'], true)) {
+                $encryption = '';
+            }
+            $settingRepo->set('smtp_encryption', $encryption);
+
+            $username = trim((string) ($_POST['smtp_username'] ?? ''));
+            $settingRepo->set('smtp_username', $username);
+
+            $password = $_POST['smtp_password'] ?? null;
+            $passwordCleared = isset($_POST['smtp_password_clear']) && $_POST['smtp_password_clear'] === '1';
+            $passwordUpdated = false;
+            if ($password !== null && $password !== '') {
+                $settingRepo->set('smtp_password', (string) $password);
+                $passwordUpdated = true;
+            } elseif ($passwordCleared) {
+                $settingRepo->set('smtp_password', '');
+            }
+
+            $fromEmail = trim((string) ($_POST['smtp_from_email'] ?? ''));
+            $settingRepo->set('smtp_from_email', $fromEmail);
+
+            $fromName = trim((string) ($_POST['smtp_from_name'] ?? ''));
+            $settingRepo->set('smtp_from_name', $fromName);
+
+            $replyTo = trim((string) ($_POST['smtp_reply_to'] ?? ''));
+            $settingRepo->set('smtp_reply_to', $replyTo);
+
+            $updates = [
+                'smtp_enabled' => $enabled,
+                'smtp_host' => $host,
+                'smtp_port' => (string) $port,
+                'smtp_encryption' => $encryption,
+                'smtp_username' => $username,
+                'smtp_from_email' => $fromEmail,
+                'smtp_from_name' => $fromName,
+                'smtp_reply_to' => $replyTo,
+                'smtp_password_updated' => $passwordUpdated,
+                'smtp_password_cleared' => $passwordCleared && !$passwordUpdated,
+            ];
+
+            echo json_encode(['message' => 'SMTP ayarları güncellendi', 'data' => $updates]);
             break;
         case 'update-settings':
             $allowed = ['primary_color', 'accent_color', 'background_color', 'gradient_start', 'gradient_end'];
@@ -714,6 +810,94 @@ try {
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
+}
+
+function notifyChapterPublished(SettingRepository $settings, UserRepository $users, array $chapter, array $manga): ?array
+{
+    if (($settings->get('smtp_enabled') ?? '0') !== '1') {
+        return ['sent' => 0, 'skipped' => 'smtp-disabled'];
+    }
+
+    $recipients = $users->listActiveUsers();
+    if (!$recipients) {
+        return ['sent' => 0, 'skipped' => 'no-recipients'];
+    }
+
+    $mailer = Mailer::fromSettings($settings);
+    $siteName = $settings->get('site_name') ?? 'Manga Diyarı';
+    $baseUrl = buildSiteBaseUrl($settings);
+
+    $chapterTitle = trim((string) ($chapter['title'] ?? ''));
+    $chapterLabel = 'Bölüm ' . $chapter['number'];
+    if ($chapterTitle !== '') {
+        $chapterLabel .= ' - ' . $chapterTitle;
+    }
+
+    $chapterUrl = $baseUrl . '/chapter.php?slug=' . rawurlencode($manga['slug'])
+        . '&chapter=' . rawurlencode((string) $chapter['number']);
+    $mangaUrl = $baseUrl . '/manga.php?slug=' . rawurlencode($manga['slug']);
+    $subject = sprintf('%s · %s', $manga['title'], $chapterLabel);
+
+    $sent = 0;
+    $errors = [];
+
+    foreach ($recipients as $recipient) {
+        $username = $recipient['username'];
+        $email = $recipient['email'];
+
+        $htmlBody = sprintf(
+            '<p>Merhaba %s,</p>'
+            . '<p><strong>%s</strong> serisine yeni bir bölüm eklendi.</p>'
+            . '<p><a href="%s">%s</a> hemen okuyabilirsiniz.</p>'
+            . '<p>Seri sayfası: <a href="%s">%s</a></p>'
+            . '<p>İyi okumalar,<br>%s</p>',
+            htmlspecialchars($username, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            htmlspecialchars($manga['title'], ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            htmlspecialchars($chapterUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            htmlspecialchars($chapterLabel, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            htmlspecialchars($mangaUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            htmlspecialchars($mangaUrl, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            htmlspecialchars($siteName, ENT_QUOTES | ENT_HTML5, 'UTF-8')
+        );
+
+        $textBody = "Merhaba {$username},\n\n"
+            . "{$manga['title']} serisine yeni bir bölüm eklendi: {$chapterLabel}.\n"
+            . "Bölümü oku: {$chapterUrl}\n"
+            . "Seri sayfası: {$mangaUrl}\n\n"
+            . "İyi okumalar,\n{$siteName}";
+
+        try {
+            $mailer->send([$email => $username], $subject, $htmlBody, ['text' => $textBody]);
+            $sent++;
+        } catch (Throwable $exception) {
+            $errors[] = $exception->getMessage();
+        }
+    }
+
+    $result = ['sent' => $sent];
+    if ($errors) {
+        $result['errors'] = array_values(array_unique($errors));
+    }
+
+    return $result;
+}
+
+function buildSiteBaseUrl(SettingRepository $settings): string
+{
+    $stored = trim((string) ($settings->get('site_base_url') ?? ''));
+    if ($stored !== '') {
+        return rtrim($stored, '/');
+    }
+
+    $scheme = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') ? 'https' : 'http';
+    $host = $_SERVER['HTTP_HOST'] ?? 'localhost';
+    $scriptDir = rtrim(dirname($_SERVER['SCRIPT_NAME'] ?? ''), '/');
+    $basePath = $scriptDir ? preg_replace('#/admin$#', '', $scriptDir) : '';
+    if ($basePath === '/' || $basePath === '.' || $basePath === null) {
+        $basePath = '';
+    }
+
+    return rtrim($scheme . '://' . $host . $basePath, '/');
 }
 
 /**
