@@ -35,18 +35,21 @@ $themeDefaults = [
     'gradient_end' => '#49a09d',
 ];
 $theme = array_replace($themeDefaults, $allSettings);
+$kiSettings = [
+    'currency_name' => $allSettings['ki_currency_name'] ?? 'Ki',
+];
 $footerText = trim((string) ($allSettings['site_footer'] ?? ''));
 $defaultFooter = '© ' . date('Y') . ' ' . $site['name'] . '. Tüm hakları saklıdır.';
 
 $sessionUser = Auth::user();
-$user = $userRepo->findById((int) $sessionUser['id']);
-if (!$user) {
+$profileUser = $userRepo->findById((int) $sessionUser['id']);
+if (!$profileUser) {
     Auth::logout();
     header('Location: login.php');
     exit;
 }
 
-unset($user['password_hash']);
+unset($profileUser['password_hash']);
 
 $error = null;
 $success = null;
@@ -56,7 +59,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
     try {
         if ($action === 'update-profile') {
-            $updated = $userRepo->updateProfile((int) $user['id'], [
+            $updated = $userRepo->updateProfile((int) $profileUser['id'], [
                 'email' => $_POST['email'] ?? '',
                 'bio' => $_POST['bio'] ?? '',
                 'avatar_url' => $_POST['avatar_url'] ?? '',
@@ -64,7 +67,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
             Auth::login($updated);
             $sessionUser = Auth::user();
-            $user = array_merge($user, $updated);
+            $profileUser = array_merge($profileUser, $updated);
             $success = 'Profil bilgileriniz güncellendi.';
         } elseif ($action === 'change-password') {
             $currentPassword = $_POST['current_password'] ?? '';
@@ -83,14 +86,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 throw new InvalidArgumentException('Yeni parola en az 6 karakter olmalıdır.');
             }
 
-            if (!$userRepo->verifyCredentials($user['email'], $currentPassword)) {
+            if (!$userRepo->verifyCredentials($profileUser['email'], $currentPassword)) {
                 throw new InvalidArgumentException('Mevcut parolanızı doğrulayamadık.');
             }
 
-            $updated = $userRepo->updateCredentials((int) $user['id'], null, null, $newPassword);
+            $updated = $userRepo->updateCredentials((int) $profileUser['id'], null, null, $newPassword);
             Auth::login($updated);
             $sessionUser = Auth::user();
-            $user = array_merge($user, $updated);
+            $profileUser = array_merge($profileUser, $updated);
             $success = 'Parolanız başarıyla güncellendi.';
         }
     } catch (Throwable $exception) {
@@ -99,9 +102,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-$joinDate = $user['created_at'] ?? null;
+$joinDate = $profileUser['created_at'] ?? null;
 $joinDateFormatted = $joinDate ? date('d F Y', strtotime($joinDate)) : null;
-$publicProfileUrl = 'member.php?u=' . urlencode($user['username']);
+$publicProfileUrl = 'member.php?u=' . urlencode($profileUser['username']);
 
 $primaryMenuItems = $menus['primary']['items'] ?? [];
 $footerMenuItems = $menus['footer']['items'] ?? [];
@@ -130,35 +133,8 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       }
     </style>
   </head>
-  <body class="bg-dark text-light">
-    <nav class="navbar navbar-expand-lg navbar-dark bg-gradient">
-      <div class="container">
-        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-          <?php if (!empty($site['logo'])): ?>
-            <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
-          <?php endif; ?>
-          <span><?= htmlspecialchars($site['name']) ?></span>
-        </a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarContent">
-          <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-lg-center">
-            <?php if (!empty($primaryMenuItems)): ?>
-              <?php foreach ($primaryMenuItems as $item): ?>
-                <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
-              <?php endforeach; ?>
-            <?php endif; ?>
-            <?php if ($sessionUser && in_array($sessionUser['role'], ['admin', 'editor'], true)): ?>
-              <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
-            <?php endif; ?>
-            <li class="nav-item"><a class="nav-link active" href="profile.php">Profilim</a></li>
-            <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($publicProfileUrl) ?>">Kamu Profili</a></li>
-            <li class="nav-item"><a class="nav-link" href="logout.php">Çıkış Yap</a></li>
-          </ul>
-        </div>
-      </div>
-    </nav>
+  <body class="site-body" data-theme="dark">
+    <?php $showSearchForm = false; $user = $sessionUser; require __DIR__ . '/partials/site-navbar.php'; unset($user); ?>
 
     <?php if (!empty($ads['header'])): ?>
       <section class="ad-slot ad-slot--header py-3">
@@ -175,15 +151,15 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
         <div class="col-lg-4">
           <div class="card bg-secondary border-0 shadow-sm h-100">
             <div class="card-body text-center p-4">
-              <?php if (!empty($user['avatar_url'])): ?>
-                <img src="<?= htmlspecialchars($user['avatar_url']) ?>" alt="Avatar" class="rounded-circle mb-3" width="120" height="120">
+              <?php if (!empty($profileUser['avatar_url'])): ?>
+                <img src="<?= htmlspecialchars($profileUser['avatar_url']) ?>" alt="Avatar" class="rounded-circle mb-3" width="120" height="120">
               <?php else: ?>
                 <div class="rounded-circle bg-dark bg-opacity-50 d-inline-flex align-items-center justify-content-center mb-3" style="width: 120px; height: 120px; font-size: 48px;">
-                  <?= htmlspecialchars(strtoupper(substr($user['username'], 0, 1))) ?>
+                  <?= htmlspecialchars(strtoupper(substr($profileUser['username'], 0, 1))) ?>
                 </div>
               <?php endif; ?>
-              <h1 class="h4 mb-1"><?= htmlspecialchars($user['username']) ?></h1>
-              <p class="text-muted small mb-2"><?= htmlspecialchars($user['email']) ?></p>
+              <h1 class="h4 mb-1"><?= htmlspecialchars($profileUser['username']) ?></h1>
+              <p class="text-muted small mb-2"><?= htmlspecialchars($profileUser['email']) ?></p>
               <?php if ($joinDateFormatted): ?>
                 <p class="text-muted small">Üyelik tarihi: <?= htmlspecialchars($joinDateFormatted) ?></p>
               <?php endif; ?>
@@ -210,23 +186,23 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                 <div class="row g-3">
                   <div class="col-md-6">
                     <label class="form-label">Kullanıcı Adı</label>
-                    <input type="text" class="form-control" value="<?= htmlspecialchars($user['username']) ?>" disabled>
+                    <input type="text" class="form-control" value="<?= htmlspecialchars($profileUser['username']) ?>" disabled>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">E-posta</label>
-                    <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($user['email']) ?>" required>
+                    <input type="email" class="form-control" name="email" value="<?= htmlspecialchars($profileUser['email']) ?>" required>
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">Avatar URL</label>
-                    <input type="url" class="form-control" name="avatar_url" placeholder="https://" value="<?= htmlspecialchars($user['avatar_url'] ?? '') ?>">
+                    <input type="url" class="form-control" name="avatar_url" placeholder="https://" value="<?= htmlspecialchars($profileUser['avatar_url'] ?? '') ?>">
                   </div>
                   <div class="col-md-6">
                     <label class="form-label">Web Sitesi</label>
-                    <input type="url" class="form-control" name="website_url" placeholder="https://" value="<?= htmlspecialchars($user['website_url'] ?? '') ?>">
+                    <input type="url" class="form-control" name="website_url" placeholder="https://" value="<?= htmlspecialchars($profileUser['website_url'] ?? '') ?>">
                   </div>
                   <div class="col-12">
                     <label class="form-label">Hakkımda</label>
-                    <textarea class="form-control" name="bio" rows="4" placeholder="Topluluğa kendinizi tanıtın."><?= htmlspecialchars($user['bio'] ?? '') ?></textarea>
+                    <textarea class="form-control" name="bio" rows="4" placeholder="Topluluğa kendinizi tanıtın."><?= htmlspecialchars($profileUser['bio'] ?? '') ?></textarea>
                   </div>
                 </div>
                 <div>
@@ -263,7 +239,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
       </div>
     </main>
 
-    <footer class="py-4 bg-black text-secondary">
+    <footer class="site-footer py-4">
       <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
         <small><?= $footerText !== '' ? $footerText : htmlspecialchars($defaultFooter) ?></small>
         <?php if (!empty($footerMenuItems)): ?>
@@ -284,5 +260,6 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     </footer>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/theme.js"></script>
   </body>
 </html>

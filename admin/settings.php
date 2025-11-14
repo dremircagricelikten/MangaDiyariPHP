@@ -59,6 +59,11 @@ $defaultStorage = $allSettings['chapter_storage_driver'] ?? 'local';
                   <label class="form-label">Footer Metni</label>
                   <input type="text" class="form-control" name="site_footer" value="<?= htmlspecialchars($allSettings['site_footer'] ?? '') ?>" placeholder="© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>">
                 </div>
+                <div class="col-md-6">
+                  <label class="form-label">Site Ana URL</label>
+                  <input type="url" class="form-control" name="site_base_url" value="<?= htmlspecialchars($allSettings['site_base_url'] ?? '') ?>" placeholder="https://example.com">
+                  <small class="text-muted">E-posta bildirimleri için kullanılacak tam adres.</small>
+                </div>
                 <div id="site-settings-message" class="col-12"></div>
               </div>
               <div class="card-footer d-flex justify-content-end">
@@ -109,6 +114,77 @@ $defaultStorage = $allSettings['chapter_storage_driver'] ?? 'local';
               </div>
               <div class="card-footer d-flex justify-content-end">
                 <button class="btn btn-primary" type="submit"><i class="bi bi-hdd-network me-1"></i>FTP Ayarlarını Kaydet</button>
+              </div>
+            </form>
+          </section>
+
+          <section class="admin-section">
+            <div class="admin-section-header">
+              <div>
+                <span class="eyebrow">Bildirim</span>
+                <h2>SMTP Ayarları</h2>
+                <p class="text-muted mb-0">Yeni bölüm bildirimlerini göndermek için SMTP sunucunuzu tanımlayın.</p>
+              </div>
+            </div>
+            <?php $smtpEnabled = ($allSettings['smtp_enabled'] ?? '0') === '1'; ?>
+            <form id="smtp-settings-form" class="card glass-card">
+              <div class="card-body row g-4">
+                <div class="col-12">
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" role="switch" id="smtp-enabled" name="smtp_enabled" value="1" <?= $smtpEnabled ? 'checked' : '' ?>>
+                    <label class="form-check-label" for="smtp-enabled">SMTP üzerinden e-posta gönderimini etkinleştir</label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">SMTP Sunucusu</label>
+                  <input type="text" class="form-control" name="smtp_host" value="<?= htmlspecialchars($allSettings['smtp_host'] ?? '') ?>" placeholder="smtp.example.com">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Port</label>
+                  <input type="number" class="form-control" name="smtp_port" min="1" value="<?= htmlspecialchars($allSettings['smtp_port'] ?? '587') ?>">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Şifreleme</label>
+                  <?php $smtpEncryption = $allSettings['smtp_encryption'] ?? ''; ?>
+                  <select class="form-select" name="smtp_encryption">
+                    <option value="" <?= $smtpEncryption === '' ? 'selected' : '' ?>>Yok</option>
+                    <option value="ssl" <?= $smtpEncryption === 'ssl' ? 'selected' : '' ?>>SSL</option>
+                    <option value="tls" <?= $smtpEncryption === 'tls' ? 'selected' : '' ?>>TLS</option>
+                  </select>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Kullanıcı Adı</label>
+                  <input type="text" class="form-control" name="smtp_username" value="<?= htmlspecialchars($allSettings['smtp_username'] ?? '') ?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Parola</label>
+                  <input type="password" class="form-control" name="smtp_password" id="smtp-password" placeholder="Değiştirmek için yeni parola girin">
+                  <?php if (!empty($allSettings['smtp_password'])): ?>
+                    <small class="text-muted">Mevcut parola korunur. Temizlemek için aşağıdaki kutuyu işaretleyin.</small>
+                  <?php else: ?>
+                    <small class="text-muted">Parola girmediğinizde alan boş bırakılabilir.</small>
+                  <?php endif; ?>
+                  <div class="form-check mt-2">
+                    <input class="form-check-input" type="checkbox" value="1" id="smtp-password-clear" name="smtp_password_clear">
+                    <label class="form-check-label" for="smtp-password-clear">Kayıtlı parolayı temizle</label>
+                  </div>
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Gönderici E-posta</label>
+                  <input type="email" class="form-control" name="smtp_from_email" value="<?= htmlspecialchars($allSettings['smtp_from_email'] ?? '') ?>" placeholder="no-reply@example.com">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Gönderici Adı</label>
+                  <input type="text" class="form-control" name="smtp_from_name" value="<?= htmlspecialchars($allSettings['smtp_from_name'] ?? $site['name']) ?>" placeholder="<?= htmlspecialchars($site['name']) ?>">
+                </div>
+                <div class="col-md-6">
+                  <label class="form-label">Yanıt Adresi</label>
+                  <input type="email" class="form-control" name="smtp_reply_to" value="<?= htmlspecialchars($allSettings['smtp_reply_to'] ?? '') ?>" placeholder="opsiyonel">
+                </div>
+                <div id="smtp-settings-message" class="col-12"></div>
+              </div>
+              <div class="card-footer d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-envelope-check me-1"></i>SMTP Ayarlarını Kaydet</button>
               </div>
             </form>
           </section>

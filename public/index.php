@@ -105,61 +105,7 @@ $siteStats = [
     </style>
   </head>
   <body class="site-body" data-theme="dark">
-    <nav class="navbar navbar-expand-lg site-navbar shadow-sm">
-      <div class="container-xxl">
-        <a class="navbar-brand d-flex align-items-center gap-2" href="/">
-          <?php if (!empty($site['logo'])): ?>
-            <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
-          <?php endif; ?>
-          <span><?= htmlspecialchars($site['name']) ?></span>
-        </a>
-        <div class="d-flex align-items-center gap-2 order-lg-3">
-          <button class="btn btn-outline-light btn-sm btn-theme-toggle" type="button" id="theme-toggle" aria-label="Temayı değiştir">
-            <i class="bi bi-moon-stars"></i>
-          </button>
-          <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarContent">
-            <span class="navbar-toggler-icon"></span>
-          </button>
-        </div>
-        <div class="collapse navbar-collapse order-lg-2" id="navbarContent">
-          <ul class="navbar-nav me-lg-auto mb-3 mb-lg-0 align-items-lg-center gap-lg-1">
-            <?php if (!empty($menus['primary']['items'])): ?>
-              <?php foreach ($menus['primary']['items'] as $item): ?>
-                <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <li class="nav-item"><a class="nav-link" href="/">Anasayfa</a></li>
-            <?php endif; ?>
-          </ul>
-          <ul class="navbar-nav ms-lg-3 mb-3 mb-lg-0 align-items-lg-center gap-lg-1">
-            <?php if ($user): ?>
-              <li class="nav-item"><span class="nav-link">Bakiye: <strong id="nav-ki-balance"><?= (int) ($user['ki_balance'] ?? 0) ?></strong> <?= htmlspecialchars($kiSettings['currency_name']) ?></span></li>
-              <?php $memberProfileUrl = 'member.php?u=' . urlencode($user['username']); ?>
-              <li class="nav-item"><a class="nav-link" href="profile.php">Profilim</a></li>
-              <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($memberProfileUrl) ?>">Kamu Profili</a></li>
-              <?php if (in_array($user['role'], ['admin', 'editor'], true)): ?>
-                <li class="nav-item"><a class="nav-link" href="../admin/index.php">Yönetim</a></li>
-              <?php endif; ?>
-              <li class="nav-item"><a class="nav-link" href="logout.php">Çıkış Yap</a></li>
-            <?php else: ?>
-              <li class="nav-item"><a class="nav-link" href="login.php">Giriş Yap</a></li>
-              <li class="nav-item"><a class="nav-link" href="register.php">Kayıt Ol</a></li>
-            <?php endif; ?>
-          </ul>
-          <form id="search-form" class="navbar-search d-lg-flex align-items-center gap-2 ms-lg-4" role="search">
-            <span class="search-icon"><i class="bi bi-search"></i></span>
-            <input type="search" id="search" class="form-control" placeholder="Manga ara...">
-            <select id="status" class="form-select">
-              <option value="">Durum: Tümü</option>
-              <option value="ongoing">Devam Ediyor</option>
-              <option value="completed">Tamamlandı</option>
-              <option value="hiatus">Ara Verildi</option>
-            </select>
-            <button class="btn btn-primary" type="submit">Ara</button>
-          </form>
-        </div>
-      </div>
-    </nav>
+    <?php $showSearchForm = true; require __DIR__ . '/partials/site-navbar.php'; ?>
 
     <?php if (!empty($ads['header'])): ?>
       <section class="ad-slot ad-slot--header py-3">
@@ -314,6 +260,34 @@ $siteStats = [
               </div>
             <?php endif; ?>
 
+            <div class="sidebar-widget top-reads-widget" data-widget="top-reads">
+              <div class="sidebar-widget__header">
+                <div>
+                  <h3>En Çok Okunanlar</h3>
+                  <p class="small text-secondary mb-0" data-top-reads-status>Son 7 gün</p>
+                </div>
+                <div class="btn-group btn-group-sm top-reads-switch" role="group" aria-label="Zaman aralığı">
+                  <button type="button" class="btn btn-outline-light" data-range="daily">Günlük</button>
+                  <button type="button" class="btn btn-outline-light active" data-range="weekly">Haftalık</button>
+                  <button type="button" class="btn btn-outline-light" data-range="monthly">Aylık</button>
+                </div>
+              </div>
+              <div class="top-reads-content">
+                <div class="top-reads-group">
+                  <h4 class="top-reads-group__title">Seriler</h4>
+                  <ol class="top-reads-list" data-top-reads="manga">
+                    <li class="top-reads-empty">Veriler yükleniyor...</li>
+                  </ol>
+                </div>
+                <div class="top-reads-group">
+                  <h4 class="top-reads-group__title">Bölümler</h4>
+                  <ol class="top-reads-list" data-top-reads="chapters">
+                    <li class="top-reads-empty">Veriler yükleniyor...</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+
             <?php $sidebarWidgets = $widgetsByArea['sidebar'] ?? []; ?>
             <?php foreach ($sidebarWidgets as $widget): ?>
               <?php if ($widget['type'] === 'popular_slider'): ?>
@@ -395,6 +369,7 @@ $siteStats = [
       ] : null, JSON_UNESCAPED_UNICODE) ?>;
       window.kiSettings = <?= json_encode($kiSettings, JSON_UNESCAPED_UNICODE) ?>;
     </script>
+    <script src="assets/theme.js"></script>
     <script src="assets/chat.js"></script>
     <script>
       window.appWidgets = <?= json_encode($activeWidgets, JSON_UNESCAPED_UNICODE) ?>;

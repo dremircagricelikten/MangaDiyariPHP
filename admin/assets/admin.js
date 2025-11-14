@@ -596,6 +596,8 @@ $(function () {
     const siteMessage = $('#site-settings-message');
     const storageForm = $('#storage-settings-form');
     const storageMessage = $('#storage-settings-message');
+    const smtpForm = $('#smtp-settings-form');
+    const smtpMessage = $('#smtp-settings-message');
 
     siteForm.on('submit', function (event) {
       event.preventDefault();
@@ -623,6 +625,22 @@ $(function () {
           showMessage(storageMessage, 'success', response.message || 'Depolama ayarları güncellendi.');
         })
         .fail((xhr) => handleError(xhr, storageMessage));
+    });
+
+    smtpForm.on('submit', function (event) {
+      event.preventDefault();
+      $.post('api.php?action=update-smtp-settings', smtpForm.serialize())
+        .done((response) => {
+          const info = response.data || {};
+          let message = response.message || 'SMTP ayarları kaydedildi.';
+          if (info.smtp_password_updated) {
+            message += ' Parola güncellendi.';
+          } else if (info.smtp_password_cleared) {
+            message += ' Parola temizlendi.';
+          }
+          showMessage(smtpMessage, 'success', message);
+        })
+        .fail((xhr) => handleError(xhr, smtpMessage));
     });
   }
 

@@ -73,6 +73,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <?= $analytics['google'] ?>
     <?php endif; ?>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="assets/styles.css">
     <style>
       :root {
@@ -84,22 +85,18 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       }
     </style>
   </head>
-  <body class="bg-dark text-light d-flex align-items-center" style="min-height: 100vh;">
-    <div class="container py-5">
-      <div class="row justify-content-center mb-4">
-        <div class="col-auto text-center">
-          <a class="navbar-brand d-inline-flex align-items-center gap-2" href="index.php">
-            <?php if (!empty($site['logo'])): ?>
-              <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
-            <?php endif; ?>
-            <span class="fs-5 fw-semibold"><?= htmlspecialchars($site['name']) ?></span>
-          </a>
-        </div>
+  <body class="site-body auth-page" data-theme="dark">
+    <div class="auth-shell">
+      <div class="auth-brand">
+        <a class="navbar-brand" href="index.php">
+          <?php if (!empty($site['logo'])): ?>
+            <img src="<?= htmlspecialchars($site['logo']) ?>" alt="<?= htmlspecialchars($site['name']) ?>" class="brand-logo">
+          <?php endif; ?>
+          <span><?= htmlspecialchars($site['name']) ?></span>
+        </a>
       </div>
-      <div class="row justify-content-center">
-        <div class="col-md-6 col-lg-4">
-          <div class="card bg-secondary border-0 shadow-lg">
-            <div class="card-body p-4">
+      <div class="card auth-card border-0">
+        <div class="card-body">
               <h1 class="h4 text-center mb-4">Yeni Üyelik</h1>
               <?php if ($error): ?>
                 <div class="alert alert-danger"><?= htmlspecialchars($error) ?></div>
@@ -129,11 +126,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
               <div class="mt-2 text-center">
                 <a href="index.php" class="link-light small">Ana sayfaya dön</a>
               </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="assets/theme.js"></script>
   </body>
 </html>
