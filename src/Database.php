@@ -268,7 +268,10 @@ class Database
             updated_at DATETIME NOT NULL,
             CONSTRAINT fk_menu_items_menu FOREIGN KEY (menu_id) REFERENCES menus(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
-
+        self::ensureColumn($pdo, 'mysql', 'users', 'bio', 'TEXT NULL');
+        self::ensureColumn($pdo, 'mysql', 'users', 'avatar_url', 'TEXT NULL');
+        self::ensureColumn($pdo, 'mysql', 'users', 'website_url', 'TEXT NULL');
+        self::ensureColumn($pdo, 'mysql', 'users', 'is_active', 'TINYINT(1) NOT NULL DEFAULT 1');
         self::ensureColumn($pdo, 'mysql', 'users', 'ki_balance', 'BIGINT NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'mysql', 'chapters', 'ki_cost', 'INT UNSIGNED NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'mysql', 'chapters', 'premium_expires_at', 'DATETIME NULL');
@@ -419,7 +422,10 @@ class Database
             updated_at TEXT NOT NULL,
             FOREIGN KEY(menu_id) REFERENCES menus(id) ON DELETE CASCADE
         )');
-
+        self::ensureColumn($pdo, 'sqlite', 'users', 'bio', 'TEXT');
+        self::ensureColumn($pdo, 'sqlite', 'users', 'avatar_url', 'TEXT');
+        self::ensureColumn($pdo, 'sqlite', 'users', 'website_url', 'TEXT');
+        self::ensureColumn($pdo, 'sqlite', 'users', 'is_active', 'INTEGER NOT NULL DEFAULT 1');
         self::ensureColumn($pdo, 'sqlite', 'users', 'ki_balance', 'INTEGER NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'sqlite', 'chapters', 'ki_cost', 'INTEGER NOT NULL DEFAULT 0');
         self::ensureColumn($pdo, 'sqlite', 'chapters', 'premium_expires_at', 'TEXT');
