@@ -19,6 +19,86 @@ $(function () {
   const lockState = $('#chapter-lock-state');
   const commentList = $('#comment-list');
   const kiDetails = $('#ki-context-details');
+  const toolbar = $('#reader-toolbar');
+  const restoreToolbarButton = $('#reader-toolbar-restore');
+  const readerModeSelect = $('#reader-mode');
+  const progressBar = $('#reader-progress-bar');
+  const progressValue = $('#reader-progress-value');
+  const readerModeKey = 'chapter-reader-mode';
+  const toolbarHiddenKey = 'chapter-toolbar-hidden';
+
+  function applyReaderMode(mode) {
+    const normalized = mode === 'fit' ? 'fit' : 'scroll';
+    if (readerModeSelect.length) {
+      readerModeSelect.val(normalized);
+    }
+    chapterContent.removeClass('reader-mode-fit');
+    if (normalized === 'fit') {
+      chapterContent.addClass('reader-mode-fit');
+    }
+  }
+
+  function updateProgress() {
+    if (!progressBar.length) {
+      return;
+    }
+    const article = chapterContent[0];
+    if (!article) {
+      progressBar.css('width', '0%').attr('aria-valuenow', 0);
+      progressValue.text('0%');
+      return;
+    }
+    const height = article.scrollHeight || 1;
+    const start = chapterContent.length ? chapterContent.offset().top : 0;
+    const scrollBottom = window.scrollY + window.innerHeight;
+    const progressRaw = ((scrollBottom - start) / height) * 100;
+    const clamped = Math.max(0, Math.min(100, progressRaw));
+    const rounded = Math.round(clamped);
+    progressBar.css('width', `${rounded}%`).attr('aria-valuenow', rounded);
+    progressValue.text(`${rounded}%`);
+  }
+
+  function hideToolbar() {
+    if (!toolbar.length) {
+      return;
+    }
+    toolbar.addClass('d-none');
+    restoreToolbarButton.removeClass('d-none');
+    localStorage.setItem(toolbarHiddenKey, '1');
+  }
+
+  function showToolbar() {
+    if (!toolbar.length) {
+      return;
+    }
+    toolbar.removeClass('d-none');
+    restoreToolbarButton.addClass('d-none');
+    localStorage.removeItem(toolbarHiddenKey);
+    updateProgress();
+  }
+
+  if (toolbar.length) {
+    if (localStorage.getItem(toolbarHiddenKey) === '1') {
+      toolbar.addClass('d-none');
+      restoreToolbarButton.removeClass('d-none');
+    }
+    $('#toggle-reader-toolbar').on('click', hideToolbar);
+    restoreToolbarButton.on('click', showToolbar);
+  }
+
+  if (readerModeSelect.length) {
+    applyReaderMode(localStorage.getItem(readerModeKey) || 'scroll');
+    readerModeSelect.on('change', function () {
+      const mode = $(this).val();
+      applyReaderMode(mode);
+      localStorage.setItem(readerModeKey, mode);
+      updateProgress();
+    });
+  }
+
+  $(window).on('scroll resize', () => {
+    window.requestAnimationFrame(updateProgress);
+  });
 
   function renderLoading() {
     chapterContent.html('<div class="text-center py-5 text-secondary">Yükleniyor…</div>');
@@ -42,6 +122,9 @@ $(function () {
         updateCommentTargets();
         populateChapterSelect(manga.id, data.number);
         loadComments();
+        applyReaderMode(localStorage.getItem(readerModeKey) || 'scroll');
+        setTimeout(updateProgress, 150);
+        chapterContent.find('img').on('load', updateProgress);
       })
       .fail((xhr) => {
         if (xhr.status === 402 && xhr.responseJSON) {
@@ -58,6 +141,8 @@ $(function () {
           updateLockMessage(response.access, response.manga, currentChapterId);
           updateCommentTargets();
           loadComments();
+          applyReaderMode(localStorage.getItem(readerModeKey) || 'scroll');
+          updateProgress();
         } else {
           chapterContent.html(`<div class="alert alert-danger">Bölüm yüklenemedi: ${xhr.responseJSON?.error || xhr.statusText}</div>`);
         }
@@ -368,4 +453,5 @@ $(function () {
   });
 
   loadChapter(initialChapterNumber);
+  updateProgress();
 });

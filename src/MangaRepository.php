@@ -19,8 +19,8 @@ class MangaRepository
         $slug = $data['slug'] ?? Slugger::slugify($data['title']);
         $timestamp = (new DateTimeImmutable())->format('Y-m-d H:i:s');
 
-        $stmt = $this->db->prepare('INSERT INTO mangas (title, slug, description, cover_image, author, status, genres, tags, created_at, updated_at)
-            VALUES (:title, :slug, :description, :cover_image, :author, :status, :genres, :tags, :created_at, :updated_at)');
+        $stmt = $this->db->prepare('INSERT INTO mangas (title, slug, description, cover_image, author, artist, status, genres, tags, created_at, updated_at)
+            VALUES (:title, :slug, :description, :cover_image, :author, :artist, :status, :genres, :tags, :created_at, :updated_at)');
 
         $stmt->execute([
             ':title' => $data['title'],
@@ -28,6 +28,7 @@ class MangaRepository
             ':description' => $data['description'] ?? '',
             ':cover_image' => $data['cover_image'] ?? '',
             ':author' => $data['author'] ?? '',
+            ':artist' => $data['artist'] ?? '',
             ':status' => $data['status'] ?? 'ongoing',
             ':genres' => $data['genres'] ?? '',
             ':tags' => $data['tags'] ?? '',
@@ -45,13 +46,14 @@ class MangaRepository
             return null;
         }
 
-        $stmt = $this->db->prepare('UPDATE mangas SET title = :title, description = :description, cover_image = :cover_image, author = :author, status = :status, genres = :genres, tags = :tags, updated_at = :updated_at WHERE id = :id');
+        $stmt = $this->db->prepare('UPDATE mangas SET title = :title, description = :description, cover_image = :cover_image, author = :author, artist = :artist, status = :status, genres = :genres, tags = :tags, updated_at = :updated_at WHERE id = :id');
         $stmt->execute([
             ':id' => $id,
             ':title' => $data['title'] ?? $existing['title'],
             ':description' => $data['description'] ?? $existing['description'],
             ':cover_image' => $data['cover_image'] ?? $existing['cover_image'],
             ':author' => $data['author'] ?? $existing['author'],
+            ':artist' => $data['artist'] ?? ($existing['artist'] ?? ''),
             ':status' => $data['status'] ?? $existing['status'],
             ':genres' => $data['genres'] ?? $existing['genres'],
             ':tags' => $data['tags'] ?? $existing['tags'],
@@ -144,6 +146,13 @@ class MangaRepository
     public function getFeatured(int $limit = 5): array
     {
         return $this->getPopular(['limit' => $limit]);
+    }
+
+
+    public function delete(int $id): bool
+    {
+        $stmt = $this->db->prepare('DELETE FROM mangas WHERE id = :id');
+        return $stmt->execute([':id' => $id]);
     }
 
     public function count(array $filters = []): int

@@ -112,21 +112,41 @@ $(function () {
     }
 
     const featured = data[0];
-    const cover = featured.cover_image || 'https://placehold.co/1200x700?text=Manga';
+    const cover = featured.cover_image || 'https://placehold.co/600x900?text=Manga';
     const url = `manga.php?slug=${encodeURIComponent(featured.slug)}`;
+    const artist = featured.artist || featured.author || 'Bilinmiyor';
 
     container.html(`
-      <a class="feature-card" href="${url}" style="background-image:url('${cover}')">
-        <div class="feature-card__overlay">
-          <span class="feature-card__badge">${formatStatus(featured.status)}</span>
-          <h3>${featured.title}</h3>
-          <p>${truncate(featured.description || 'Topluluğun sevdiği popüler serilerden biri.', 180)}</p>
-          <div class="feature-card__actions">
-            <span><i class="bi bi-person"></i> ${featured.author || 'Bilinmiyor'}</span>
-            <span class="feature-card__cta">Seriye Git <i class="bi bi-arrow-right"></i></span>
-          </div>
+      <article class="hero-feature">
+        <a class="hero-feature__media" href="${url}" aria-label="${featured.title}">
+          <img src="${cover}" alt="${featured.title}" loading="lazy">
+        </a>
+        <div class="hero-feature__content">
+          <span class="hero-feature__badge">${formatStatus(featured.status)}</span>
+          <h3 class="hero-feature__title"><a href="${url}">${featured.title}</a></h3>
+          <p class="hero-feature__description">${truncate(
+            featured.description || 'Topluluğun sevdiği popüler serilerden biri.',
+            220
+          )}</p>
+          <dl class="hero-feature__meta">
+            <div>
+              <dt>Yazar</dt>
+              <dd>${featured.author || 'Bilinmiyor'}</dd>
+            </div>
+            <div>
+              <dt>Çizer</dt>
+              <dd>${artist}</dd>
+            </div>
+            <div>
+              <dt>Tür</dt>
+              <dd>${featured.genres || 'Belirtilmedi'}</dd>
+            </div>
+          </dl>
+          <a class="btn btn-primary btn-sm hero-feature__cta" href="${url}">
+            Seriye Git <i class="bi bi-arrow-right ms-1"></i>
+          </a>
         </div>
-      </a>
+      </article>
     `);
   }
 

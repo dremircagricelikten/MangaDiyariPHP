@@ -32,6 +32,8 @@ $themeDefaults = [
     'gradient_end' => '#49a09d',
 ];
 $theme = array_replace($themeDefaults, $allSettings);
+$footerText = trim((string) ($allSettings['site_footer'] ?? ''));
+$defaultFooter = '© ' . date('Y') . ' ' . $site['name'] . '. Tüm hakları saklıdır.';
 $kiSettings = [
     'currency_name' => $allSettings['ki_currency_name'] ?? 'Ki',
     'comment_reward' => (int) ($allSettings['ki_comment_reward'] ?? 0),
@@ -119,6 +121,29 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     <main class="container my-4" id="chapter-reader" data-slug="<?= htmlspecialchars($slug) ?>" data-chapter="<?= htmlspecialchars($chapterNumber) ?>">
       <div class="row g-4">
         <div class="<?php if (!empty($ads['sidebar'])): ?>col-lg-9<?php else: ?>col-12<?php endif; ?>">
+          <div id="reader-toolbar" class="reader-toolbar mb-4">
+            <div class="reader-toolbar__section">
+              <label class="form-label form-label-sm mb-1" for="reader-mode">Okuma Biçimi</label>
+              <select id="reader-mode" class="form-select form-select-sm">
+                <option value="scroll">Uzun Kaydırma</option>
+                <option value="fit">Genişlik Uyumlu</option>
+              </select>
+            </div>
+            <div class="reader-toolbar__progress">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="small text-uppercase text-secondary">Bölüm İlerlemesi</span>
+                <strong class="reader-toolbar__progress-value" id="reader-progress-value">0%</strong>
+              </div>
+              <div class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="Okuma ilerlemesi">
+                <div class="progress-bar" id="reader-progress-bar" style="width: 0%"></div>
+              </div>
+            </div>
+            <div class="reader-toolbar__actions">
+              <button class="btn btn-outline-light btn-sm" type="button" id="toggle-reader-toolbar"><i class="bi bi-eye-slash me-1"></i>Çubuğu Gizle</button>
+            </div>
+          </div>
+          <button type="button" class="btn btn-outline-light btn-sm reader-toolbar-restore d-none" id="reader-toolbar-restore"><i class="bi bi-eye me-1"></i>Okuma çubuğunu göster</button>
+
           <div id="ki-balance-banner" class="alert alert-secondary d-flex justify-content-between align-items-center gap-3 mb-4">
             <div>
               <strong>Toplam <?= htmlspecialchars($kiSettings['currency_name']) ?>:</strong>
@@ -193,7 +218,7 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
 
     <footer class="py-4 bg-black text-secondary">
       <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
-        <small>© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>. Tüm hakları saklıdır.</small>
+        <small><?= $footerText !== '' ? $footerText : htmlspecialchars($defaultFooter) ?></small>
         <?php if (!empty($footerMenuItems)): ?>
           <ul class="nav footer-menu">
             <?php foreach ($footerMenuItems as $item): ?>

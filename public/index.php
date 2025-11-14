@@ -50,6 +50,8 @@ $theme = array_replace($themeDefaults, $allSettings);
 $kiSettings = [
     'currency_name' => $allSettings['ki_currency_name'] ?? 'Ki',
 ];
+$footerText = trim((string) ($allSettings['site_footer'] ?? ''));
+$defaultFooter = '© ' . date('Y') . ' ' . $site['name'] . '. Tüm hakları saklıdır.';
 
 $activeWidgetList = $widgetRepo->getActive();
 $activeWidgets = [];
@@ -365,7 +367,7 @@ $siteStats = [
 
     <footer class="site-footer py-4">
       <div class="container-xxl d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
-        <small>© <?= date('Y') ?> <?= htmlspecialchars($site['name']) ?>. Tüm hakları saklıdır.</small>
+        <small><?= $footerText !== '' ? $footerText : htmlspecialchars($defaultFooter) ?></small>
         <?php if (!empty($menus['footer']['items'])): ?>
           <ul class="nav footer-menu">
             <?php foreach ($menus['footer']['items'] as $item): ?>
