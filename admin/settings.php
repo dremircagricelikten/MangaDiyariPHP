@@ -6,6 +6,7 @@ $pageSubtitle = 'Genel marka kimliği, depolama tercihleri ve iletişim ayarlar�
 $headerActions = [];
 $allSettings = $settingRepo->all();
 $defaultStorage = $allSettings['chapter_storage_driver'] ?? 'local';
+$hasFtpPassword = !empty($allSettings['ftp_password'] ?? '');
 ?>
 <!doctype html>
 <html lang="tr">
@@ -81,7 +82,7 @@ $defaultStorage = $allSettings['chapter_storage_driver'] ?? 'local';
               </div>
             </div>
             <form id="storage-settings-form" class="card glass-card">
-              <div class="card-body row g-4">
+              <div class="card-body row g-4 align-items-end">
                 <div class="col-md-6">
                   <label class="form-label">FTP Host</label>
                   <input type="text" class="form-control" name="ftp_host" value="<?= htmlspecialchars($allSettings['ftp_host'] ?? '') ?>" placeholder="ftp.ornek.com">
@@ -103,16 +104,37 @@ $defaultStorage = $allSettings['chapter_storage_driver'] ?? 'local';
                 </div>
                 <div class="col-md-6">
                   <label class="form-label">Şifre</label>
-                  <input type="password" class="form-control" name="ftp_password" value="<?= htmlspecialchars($allSettings['ftp_password'] ?? '') ?>">
+                  <input type="password" class="form-control" name="ftp_password" placeholder="Yeni şifre">
+                  <small class="text-muted d-block mt-2">Yeni bir parola girmediğiniz sürece mevcut parola korunur.</small>
+                  <?php if ($hasFtpPassword): ?>
+                    <div class="form-check mt-2">
+                      <input class="form-check-input" type="checkbox" name="ftp_password_clear" id="ftp-password-clear" value="1">
+                      <label class="form-check-label" for="ftp-password-clear">Kayıtlı parolayı temizle</label>
+                    </div>
+                  <?php endif; ?>
                 </div>
                 <div class="col-md-12">
                   <label class="form-label">Uzaktan Klasör</label>
                   <input type="text" class="form-control" name="ftp_root" value="<?= htmlspecialchars($allSettings['ftp_root'] ?? '/public_html/chapters') ?>" placeholder="/path/to/chapters">
                   <small class="text-muted">Bölümler bu dizin altında <code>chapter_id</code> klasörlerinde saklanır.</small>
                 </div>
+                <div class="col-md-6">
+                  <label class="form-label">Dosya URL Temeli</label>
+                  <input type="url" class="form-control" name="ftp_base_url" value="<?= htmlspecialchars($allSettings['ftp_base_url'] ?? '') ?>" placeholder="https://cdn.ornek.com/chapters">
+                  <small class="text-muted">Okuyuculara sunulacak kök adres. Sonunda <code>/</code> bulunmasına gerek yoktur.</small>
+                </div>
+                <div class="col-md-6">
+                  <div class="alert alert-info small mb-0">
+                    <i class="bi bi-info-circle me-1"></i> Parolayı değiştirirken yeni değer girin. Boş bırakırsanız mevcut parola korunur.
+                  </div>
+                </div>
                 <div id="storage-settings-message" class="col-12"></div>
               </div>
-              <div class="card-footer d-flex justify-content-end">
+              <div class="card-footer d-flex flex-wrap gap-3 justify-content-between align-items-center">
+                <button class="btn btn-outline-light" type="button" id="storage-test-ftp">
+                  <span class="button-label"><i class="bi bi-plug"></i> Bağlantıyı Test Et</span>
+                  <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                </button>
                 <button class="btn btn-primary" type="submit"><i class="bi bi-hdd-network me-1"></i>FTP Ayarlarını Kaydet</button>
               </div>
             </form>
