@@ -71,15 +71,24 @@ try {
                 }
             }
 
+            $coverImage = trim((string) ($_POST['cover_image'] ?? ''));
+            if (!empty($_FILES['cover_upload']['tmp_name']) && ($_FILES['cover_upload']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $uploadedCover = persistCoverUpload($_FILES['cover_upload']);
+                if ($uploadedCover !== null) {
+                    $coverImage = $uploadedCover;
+                }
+            }
+
             $manga = $mangaRepo->create([
                 'title' => trim($_POST['title']),
                 'description' => trim($_POST['description'] ?? ''),
-                'cover_image' => trim($_POST['cover_image'] ?? ''),
+                'cover_image' => $coverImage,
                 'author' => trim($_POST['author'] ?? ''),
                 'artist' => trim($_POST['artist'] ?? ''),
                 'status' => $_POST['status'] ?? 'ongoing',
                 'genres' => trim($_POST['type'] ?? ($_POST['genres'] ?? '')),
                 'tags' => trim($_POST['tags'] ?? ''),
+                'slug' => trim((string) ($_POST['slug'] ?? '')),
             ]);
 
             echo json_encode(['message' => 'Seri başarıyla oluşturuldu', 'manga' => $manga]);
@@ -90,15 +99,31 @@ try {
                 throw new InvalidArgumentException('Geçersiz manga');
             }
 
+            $coverImage = null;
+            if (!empty($_FILES['cover_upload']['tmp_name']) && ($_FILES['cover_upload']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+                $uploadedCover = persistCoverUpload($_FILES['cover_upload']);
+                if ($uploadedCover !== null) {
+                    $coverImage = $uploadedCover;
+                }
+            } elseif (array_key_exists('cover_image', $_POST)) {
+                $coverImage = trim((string) $_POST['cover_image']);
+            }
+
+            $slugValue = null;
+            if (array_key_exists('slug', $_POST)) {
+                $slugValue = trim((string) $_POST['slug']);
+            }
+
             $payload = [
                 'title' => isset($_POST['title']) ? trim((string) $_POST['title']) : null,
                 'description' => isset($_POST['description']) ? trim((string) $_POST['description']) : null,
-                'cover_image' => isset($_POST['cover_image']) ? trim((string) $_POST['cover_image']) : null,
+                'cover_image' => $coverImage,
                 'author' => isset($_POST['author']) ? trim((string) $_POST['author']) : null,
                 'artist' => isset($_POST['artist']) ? trim((string) $_POST['artist']) : null,
                 'status' => isset($_POST['status']) ? (string) $_POST['status'] : null,
                 'genres' => isset($_POST['type']) ? trim((string) $_POST['type']) : (isset($_POST['genres']) ? trim((string) $_POST['genres']) : null),
                 'tags' => isset($_POST['tags']) ? trim((string) $_POST['tags']) : null,
+                'slug' => $slugValue !== null ? $slugValue : null,
             ];
 
             $manga = $mangaRepo->update($id, array_filter($payload, fn($value) => $value !== null));
@@ -389,6 +414,52 @@ try {
 
             $kiRepo->deleteMarketOffer($offerId);
             echo json_encode(['message' => 'Teklif silindi']);
+            break;
+        case 'list-payment-methods':
+            $methods = $kiRepo->listPaymentMethods(false);
+            echo json_encode(['data' => $methods]);
+            break;
+        case 'save-payment-method':
+            $method = $kiRepo->savePaymentMethod($_POST);
+            echo json_encode(['message' => 'Ödeme yöntemi kaydedildi', 'method' => $method]);
+            break;
+        case 'delete-payment-method':
+            $methodId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($methodId <= 0) {
+                throw new InvalidArgumentException('Geçersiz ödeme yöntemi');
+            }
+
+            $kiRepo->deletePaymentMethod($methodId);
+            echo json_encode(['message' => 'Ödeme yöntemi silindi']);
+            break;
+        case 'list-market-orders':
+            $statusFilter = trim((string) ($_GET['status'] ?? ''));
+            $filters = [];
+            if ($statusFilter !== '') {
+                $filters['status'] = $statusFilter;
+            }
+            $orders = $kiRepo->listMarketOrders($filters);
+            echo json_encode(['data' => $orders]);
+            break;
+        case 'save-market-order':
+            $order = $kiRepo->createMarketOrder($_POST);
+            echo json_encode(['message' => 'Sipariş oluşturuldu', 'order' => $order]);
+            break;
+        case 'update-market-order':
+            $orderId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($orderId <= 0) {
+                throw new InvalidArgumentException('Geçersiz sipariş');
+            }
+            $order = $kiRepo->updateMarketOrder($orderId, $_POST);
+            echo json_encode(['message' => 'Sipariş güncellendi', 'order' => $order]);
+            break;
+        case 'get-market-order':
+            $orderId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($orderId <= 0) {
+                throw new InvalidArgumentException('Geçersiz sipariş');
+            }
+            $order = $kiRepo->findMarketOrder($orderId);
+            echo json_encode(['data' => $order]);
             break;
         case 'dashboard-stats':
             $stats = [
@@ -1211,4 +1282,27 @@ function persistLogoUpload(array $file): ?string
     }
 
     return 'uploads/branding/' . $filename;
+}
+
+function persistCoverUpload(array $file): ?string
+{
+    $allowed = ['jpg', 'jpeg', 'png', 'webp', 'gif'];
+    $extension = strtolower((string) pathinfo((string) $file['name'], PATHINFO_EXTENSION));
+    if (!in_array($extension, $allowed, true)) {
+        throw new InvalidArgumentException('Desteklenmeyen kapak görseli formatı.');
+    }
+
+    $coversDir = __DIR__ . '/../public/uploads/covers';
+    if (!is_dir($coversDir)) {
+        mkdir($coversDir, 0775, true);
+    }
+
+    $filename = 'cover-' . date('YmdHis') . '-' . substr(bin2hex(random_bytes(6)), 0, 12) . '.' . $extension;
+    $target = $coversDir . '/' . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $target)) {
+        return null;
+    }
+
+    return 'uploads/covers/' . $filename;
 }

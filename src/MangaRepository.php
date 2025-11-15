@@ -16,7 +16,8 @@ class MangaRepository
 
     public function create(array $data): array
     {
-        $slug = $data['slug'] ?? Slugger::slugify($data['title']);
+        $baseSlug = $data['slug'] ?? $data['title'];
+        $slug = $this->ensureUniqueSlug(Slugger::slugify((string) $baseSlug));
         $timestamp = (new DateTimeImmutable())->format('Y-m-d H:i:s');
 
         $stmt = $this->db->prepare('INSERT INTO mangas (title, slug, description, cover_image, author, artist, status, genres, tags, created_at, updated_at)
@@ -46,10 +47,19 @@ class MangaRepository
             return null;
         }
 
-        $stmt = $this->db->prepare('UPDATE mangas SET title = :title, description = :description, cover_image = :cover_image, author = :author, artist = :artist, status = :status, genres = :genres, tags = :tags, updated_at = :updated_at WHERE id = :id');
+        $slug = $existing['slug'];
+        if (array_key_exists('slug', $data) && trim((string) $data['slug']) !== '') {
+            $candidate = Slugger::slugify((string) $data['slug']);
+            if ($candidate !== $existing['slug']) {
+                $slug = $this->ensureUniqueSlug($candidate, $id);
+            }
+        }
+
+        $stmt = $this->db->prepare('UPDATE mangas SET title = :title, slug = :slug, description = :description, cover_image = :cover_image, author = :author, artist = :artist, status = :status, genres = :genres, tags = :tags, updated_at = :updated_at WHERE id = :id');
         $stmt->execute([
             ':id' => $id,
             ':title' => $data['title'] ?? $existing['title'],
+            ':slug' => $slug,
             ':description' => $data['description'] ?? $existing['description'],
             ':cover_image' => $data['cover_image'] ?? $existing['cover_image'],
             ':author' => $data['author'] ?? $existing['author'],
@@ -61,6 +71,36 @@ class MangaRepository
         ]);
 
         return $this->findById($id);
+    }
+
+    private function ensureUniqueSlug(string $slug, ?int $ignoreId = null): string
+    {
+        $base = $slug !== '' ? $slug : 'manga';
+        $candidate = $base;
+        $suffix = 1;
+
+        while ($this->slugExists($candidate, $ignoreId)) {
+            $candidate = $base . '-' . $suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function slugExists(string $slug, ?int $ignoreId = null): bool
+    {
+        $query = 'SELECT id FROM mangas WHERE slug = :slug';
+        $params = [':slug' => $slug];
+
+        if ($ignoreId !== null) {
+            $query .= ' AND id != :id';
+            $params[':id'] = $ignoreId;
+        }
+
+        $stmt = $this->db->prepare($query . ' LIMIT 1');
+        $stmt->execute($params);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
     }
 
     public function findById(int $id): ?array

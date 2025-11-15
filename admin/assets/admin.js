@@ -75,6 +75,91 @@ $(function () {
     return `<span class="badge ${cls}">${label}</span>`;
   }
 
+  function initCoverUpload(scope) {
+    const container = scope ? $(scope) : $(document);
+    container.find('[data-cover-trigger]').each(function () {
+      const button = $(this);
+      const targetSelector = button.data('cover-trigger');
+      const defaultLabel = button.data('default-label') || button.text();
+      if (!targetSelector) {
+        return;
+      }
+      const input = $(targetSelector);
+      if (!input.length) {
+        return;
+      }
+      const feedback = $(`[data-cover-selected-for="${targetSelector}"]`);
+
+      button.off('click.cover').on('click.cover', (event) => {
+        event.preventDefault();
+        input.trigger('click');
+      });
+
+      input.off('change.cover').on('change.cover', function () {
+        const file = this.files && this.files[0] ? this.files[0] : null;
+        if (file) {
+          const label = file.name.length > 26 ? `${file.name.substring(0, 23)}…` : file.name;
+          button.text(label).removeClass('btn-outline-light').addClass('btn-success');
+          if (feedback.length) {
+            feedback.text(`Seçili dosya: ${file.name}`);
+          }
+        } else {
+          button.text(defaultLabel).removeClass('btn-success').addClass('btn-outline-light');
+          if (feedback.length) {
+            feedback.text('URL girebilir veya dosya seçebilirsiniz.');
+          }
+        }
+      });
+    });
+  }
+
+  function bindChapterEditForm(onUpdated, onDeleted) {
+    const form = $('#chapter-edit-form');
+    if (!form.length || form.data('modal-bound')) {
+      return;
+    }
+    form.data('modal-bound', true);
+    const message = $('#chapter-edit-message');
+
+    form.on('submit', function (event) {
+      event.preventDefault();
+      const formData = new FormData(this);
+      $.ajax({
+        url: 'api.php?action=update-chapter',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+      })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Bölüm güncellendi.');
+          if (typeof onUpdated === 'function') {
+            onUpdated();
+          }
+          refreshDashboardStats();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    $('#delete-chapter').on('click', function () {
+      const id = $('#edit-chapter-id').val();
+      if (!id || !window.confirm('Bu bölümü silmek istediğinize emin misiniz?')) {
+        return;
+      }
+      $.post('api.php?action=delete-chapter', { id })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Bölüm silindi.');
+          const modalInstance = bootstrap.Modal.getInstance(document.getElementById('chapter-edit-modal'));
+          modalInstance?.hide();
+          if (typeof onDeleted === 'function') {
+            onDeleted();
+          }
+          refreshDashboardStats();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+  }
+
   function applyDashboardStats(stats = {}) {
     Object.entries(stats).forEach(([key, value]) => {
       const target = $(`[data-dashboard-stat="${key}"]`);
@@ -182,9 +267,20 @@ $(function () {
     const emptyState = $('#manga-table-empty');
     const searchInput = $('#manga-search');
     const statusFilter = $('#manga-status-filter');
-    let searchTimer = null;
     const modalElement = document.getElementById('manga-edit-modal');
     const editModal = modalElement ? new bootstrap.Modal(modalElement) : null;
+    const defaultStorage = (body.data('default-storage') || 'local').toString();
+    const inlineForm = $('#inline-chapter-form');
+    const inlineMessage = $('#inline-chapter-message');
+    const inlineTableBody = $('#inline-chapter-table tbody');
+    const inlineEmpty = $('#inline-chapter-empty');
+    const inlineSort = $('#inline-chapter-sort');
+    const inlineMangaId = $('#inline-chapter-manga-id');
+    let searchTimer = null;
+    let currentMangaId = null;
+
+    initCoverUpload(form);
+    initCoverUpload('#manga-edit-modal');
 
     function renderMangaRow(manga) {
       const cover = manga.cover_image || 'https://placehold.co/64x96?text=Manga';
@@ -231,17 +327,103 @@ $(function () {
         });
     }
 
+    function refreshMangaOptions() {
+      fetchMangaOptions().then(() => {
+        fillMangaSelect($('#manga-select'));
+        fillMangaSelect($('#bulk-manga-select'));
+        fillMangaSelect($('#chapter-list-manga'), 'Seri seçin');
+      });
+    }
+
+    function applyInlineStorageDefault() {
+      if (!inlineForm.length) {
+        return;
+      }
+      if (defaultStorage === 'ftp') {
+        $('#inline-storage-ftp').prop('checked', true);
+        $('#inline-storage-local').prop('checked', false);
+      } else {
+        $('#inline-storage-local').prop('checked', true);
+        $('#inline-storage-ftp').prop('checked', false);
+      }
+    }
+
+    function disableInlineForm() {
+      if (!inlineForm.length) {
+        return;
+      }
+      inlineForm.find('input, textarea, button, select').prop('disabled', true);
+      inlineMangaId.val('');
+      inlineTableBody.empty();
+      inlineEmpty.removeClass('d-none').text('Mangayı düzenlemek için listeden seçim yapın.');
+    }
+
+    function renderInlineChapterRow(chapter) {
+      const premiumLabel = chapter.ki_cost > 0 ? `<span class="badge bg-warning text-dark">Ki ${chapter.ki_cost}</span>` : '<span class="badge bg-success bg-opacity-50">Ücretsiz</span>';
+      const assetCount = Array.isArray(chapter.assets) ? chapter.assets.length : 0;
+      const updated = formatDateTime(chapter.updated_at || chapter.created_at);
+      return `
+        <tr data-chapter-id="${chapter.id}">
+          <td><span class="fw-semibold">Bölüm ${escapeHtml(chapter.number)}</span></td>
+          <td>${escapeHtml(chapter.title || '')}</td>
+          <td>${premiumLabel}</td>
+          <td>${assetCount}</td>
+          <td>${updated}</td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm" role="group">
+              <button class="btn btn-outline-light inline-chapter-edit" type="button"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-outline-danger inline-chapter-delete" type="button"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>`;
+    }
+
+    function loadInlineChapters() {
+      if (!inlineForm.length) {
+        return;
+      }
+      if (!currentMangaId) {
+        disableInlineForm();
+        return;
+      }
+      inlineForm.find('input, textarea, button, select').prop('disabled', false);
+      inlineMangaId.val(currentMangaId);
+      inlineEmpty.addClass('d-none');
+      inlineTableBody.html('<tr><td colspan="6" class="text-center text-muted">Yükleniyor...</td></tr>');
+      $.getJSON('api.php', {
+        action: 'list-chapters',
+        manga_id: currentMangaId,
+        order: inlineSort.val(),
+      })
+        .done(({ data }) => {
+          inlineTableBody.empty();
+          if (!data || !data.length) {
+            inlineEmpty.removeClass('d-none').text('Bu mangaya ait bölüm bulunamadı.');
+            return;
+          }
+          data.forEach((chapter) => inlineTableBody.append(renderInlineChapterRow(chapter)));
+        })
+        .fail((xhr) => {
+          inlineTableBody.html('<tr><td colspan="6" class="text-center text-danger">Bölümler yüklenemedi.</td></tr>');
+          handleError(xhr, inlineMessage);
+        });
+    }
+
     form.on('submit', function (event) {
       event.preventDefault();
-      $.post('api.php?action=create-manga', form.serialize())
+      const formData = new FormData(this);
+      $.ajax({
+        url: 'api.php?action=create-manga',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+      })
         .done((response) => {
           showMessage(message, 'success', response.message || 'Manga oluşturuldu.');
-          form.trigger('reset');
-          fetchMangaOptions().then(() => {
-            fillMangaSelect($('#manga-select'));
-            fillMangaSelect($('#bulk-manga-select'));
-            fillMangaSelect($('#chapter-list-manga'), 'Seri seçin');
-          });
+          this.reset();
+          form.find('input[type="file"]').val('').trigger('change');
+          refreshMangaOptions();
           loadMangaTable();
           refreshDashboardStats();
         })
@@ -256,8 +438,7 @@ $(function () {
     });
 
     tableBody.on('click', '.manga-edit', function () {
-      const row = $(this).closest('tr');
-      const mangaId = row.data('manga-id');
+      const mangaId = $(this).closest('tr').data('manga-id');
       if (!mangaId) {
         return;
       }
@@ -266,6 +447,7 @@ $(function () {
         .done(({ data }) => {
           $('#edit-manga-id').val(data.id);
           $('#edit-manga-title').val(data.title);
+          $('#edit-manga-slug').val(data.slug);
           $('#edit-manga-cover').val(data.cover_image);
           $('#edit-manga-description').val(data.description);
           $('#edit-manga-type').val(data.genres);
@@ -273,6 +455,27 @@ $(function () {
           $('#edit-manga-author').val(data.author);
           $('#edit-manga-artist').val(data.artist);
           $('#edit-manga-tags').val(data.tags);
+          $('#edit-manga-cover-upload').val('').trigger('change');
+          initCoverUpload('#manga-edit-modal');
+          if (modalElement) {
+            const generalTab = modalElement.querySelector('#manga-tab-general');
+            if (generalTab) {
+              const tab = new bootstrap.Tab(generalTab);
+              tab.show();
+            }
+          }
+          currentMangaId = data.id;
+          if (inlineForm.length) {
+            inlineForm[0].reset();
+            inlineForm.find('input[type="file"]').val('').trigger('change');
+            inlineMessage.empty();
+            applyInlineStorageDefault();
+            loadInlineChapters();
+            bindChapterEditForm(() => loadInlineChapters(), () => {
+              loadInlineChapters();
+              loadMangaTable();
+            });
+          }
           editModal?.show();
         });
     });
@@ -280,15 +483,18 @@ $(function () {
     $('#manga-edit-form').on('submit', function (event) {
       event.preventDefault();
       const editMessage = $('#manga-edit-message');
-      $.post('api.php?action=update-manga', $(this).serialize())
+      const formData = new FormData(this);
+      $.ajax({
+        url: 'api.php?action=update-manga',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+      })
         .done((response) => {
           showMessage(editMessage, 'success', response.message || 'Manga güncellendi.');
           loadMangaTable();
-          fetchMangaOptions().then(() => {
-            fillMangaSelect($('#manga-select'));
-            fillMangaSelect($('#bulk-manga-select'));
-            fillMangaSelect($('#chapter-list-manga'), 'Seri seçin');
-          });
+          refreshMangaOptions();
         })
         .fail((xhr) => handleError(xhr, editMessage));
     });
@@ -303,23 +509,92 @@ $(function () {
         .done((response) => {
           showMessage(editMessage, 'success', response.message || 'Manga silindi.');
           editModal?.hide();
+          currentMangaId = null;
+          disableInlineForm();
           loadMangaTable();
-          fetchMangaOptions().then(() => {
-            fillMangaSelect($('#manga-select'));
-            fillMangaSelect($('#bulk-manga-select'));
-            fillMangaSelect($('#chapter-list-manga'), 'Seri seçin');
-          });
+          refreshMangaOptions();
           refreshDashboardStats();
         })
         .fail((xhr) => handleError(xhr, editMessage));
     });
 
-    fetchMangaOptions().then(() => {
-      fillMangaSelect($('#manga-select'));
-      fillMangaSelect($('#bulk-manga-select'));
-      fillMangaSelect($('#chapter-list-manga'), 'Seri seçin');
+    inlineForm.on('submit', function (event) {
+      if (!inlineForm.length) {
+        return;
+      }
+      event.preventDefault();
+      if (!currentMangaId) {
+        showMessage(inlineMessage, 'danger', 'Önce düzenlemek için bir manga seçin.');
+        return;
+      }
+      const formData = new FormData(this);
+      formData.set('manga_id', currentMangaId);
+      $.ajax({
+        url: 'api.php?action=create-chapter',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+      })
+        .done((response) => {
+          showMessage(inlineMessage, 'success', response.message || 'Bölüm oluşturuldu.');
+          inlineForm[0].reset();
+          inlineForm.find('input[type="file"]').val('').trigger('change');
+          applyInlineStorageDefault();
+          loadInlineChapters();
+          loadMangaTable();
+          refreshDashboardStats();
+        })
+        .fail((xhr) => handleError(xhr, inlineMessage));
     });
+
+    inlineSort.on('change', loadInlineChapters);
+
+    inlineTableBody.on('click', '.inline-chapter-edit', function () {
+      const chapterId = $(this).closest('tr').data('chapter-id');
+      if (!chapterId) {
+        return;
+      }
+      $('#chapter-edit-message').empty();
+      $.getJSON('api.php', { action: 'get-chapter', id: chapterId })
+        .done(({ data }) => {
+          $('#edit-chapter-id').val(data.id);
+          $('#edit-chapter-number').val(data.number);
+          $('#edit-chapter-title').val(data.title);
+          $('#edit-chapter-content').val(data.content);
+          $('#edit-chapter-ki').val(data.ki_cost);
+          $('#edit-chapter-premium').val(data.premium_expires_at ? data.premium_expires_at.replace(' ', 'T') : '');
+          $('#edit-chapter-files').val('');
+          bindChapterEditForm(() => loadInlineChapters(), () => {
+            loadInlineChapters();
+            loadMangaTable();
+          });
+          const chapterModalEl = document.getElementById('chapter-edit-modal');
+          if (chapterModalEl) {
+            const modalInstance = bootstrap.Modal.getOrCreateInstance(chapterModalEl);
+            modalInstance.show();
+          }
+        });
+    });
+
+    inlineTableBody.on('click', '.inline-chapter-delete', function () {
+      const chapterId = $(this).closest('tr').data('chapter-id');
+      if (!chapterId || !window.confirm('Bu bölümü silmek istediğinize emin misiniz?')) {
+        return;
+      }
+      $.post('api.php?action=delete-chapter', { id: chapterId })
+        .done((response) => {
+          showMessage(inlineMessage, 'success', response.message || 'Bölüm silindi.');
+          loadInlineChapters();
+          loadMangaTable();
+          refreshDashboardStats();
+        })
+        .fail((xhr) => handleError(xhr, inlineMessage));
+    });
+
+    refreshMangaOptions();
     loadMangaTable();
+    disableInlineForm();
   }
   function initChapters() {
     const singleForm = $('#chapter-form');
@@ -445,39 +720,10 @@ $(function () {
         });
     });
 
-    $('#chapter-edit-form').on('submit', function (event) {
-      event.preventDefault();
-      const formData = new FormData(this);
-      const message = $('#chapter-edit-message');
-      $.ajax({
-        url: 'api.php?action=update-chapter',
-        type: 'POST',
-        data: formData,
-        processData: false,
-        contentType: false,
-      })
-        .done((response) => {
-          showMessage(message, 'success', response.message || 'Bölüm güncellendi.');
-          loadChapters();
-          refreshDashboardStats();
-        })
-        .fail((xhr) => handleError(xhr, message));
-    });
-
-    $('#delete-chapter').on('click', function () {
-      const id = $('#edit-chapter-id').val();
-      if (!id || !window.confirm('Bu bölümü silmek istediğinize emin misiniz?')) {
-        return;
-      }
-      const message = $('#chapter-edit-message');
-      $.post('api.php?action=delete-chapter', { id })
-        .done((response) => {
-          showMessage(message, 'success', response.message || 'Bölüm silindi.');
-          editModal?.hide();
-          loadChapters();
-          refreshDashboardStats();
-        })
-        .fail((xhr) => handleError(xhr, message));
+    bindChapterEditForm(loadChapters, () => {
+      loadChapters();
+      const modalInstance = bootstrap.Modal.getInstance(document.getElementById('chapter-edit-modal'));
+      modalInstance?.hide();
     });
 
     fetchMangaOptions().then(() => {
@@ -487,12 +733,29 @@ $(function () {
   }
 
   function initMarket() {
-    const form = $('#market-form');
-    const message = $('#market-form-message');
-    const tableBody = $('#market-table tbody');
-    const emptyState = $('#market-table-empty');
-    const modalElement = document.getElementById('market-edit-modal');
-    const editModal = modalElement ? new bootstrap.Modal(modalElement) : null;
+    const offerForm = $('#market-form');
+    const offerMessage = $('#market-form-message');
+    const offerTableBody = $('#market-table tbody');
+    const offerEmptyState = $('#market-table-empty');
+    const offerModalElement = document.getElementById('market-edit-modal');
+    const offerEditModal = offerModalElement ? new bootstrap.Modal(offerModalElement) : null;
+
+    const paymentForm = $('#payment-method-form');
+    const paymentMessage = $('#payment-method-message');
+    const paymentTableBody = $('#payment-method-table tbody');
+    const paymentEmptyState = $('#payment-method-empty');
+
+    const orderTableBody = $('#market-order-table tbody');
+    const orderEmptyState = $('#market-order-empty');
+    const orderStatusFilter = $('#market-order-status');
+    const orderRefreshButton = $('#refresh-market-orders');
+    const orderModalElement = document.getElementById('market-order-modal');
+    const orderModal = orderModalElement ? new bootstrap.Modal(orderModalElement) : null;
+    const orderForm = $('#market-order-form');
+    const orderMessage = $('#market-order-message');
+
+    let marketOffers = [];
+    let paymentMethods = [];
 
     function renderOfferRow(offer) {
       return `
@@ -511,55 +774,180 @@ $(function () {
         </tr>`;
     }
 
+    function formatOrderStatus(status) {
+      const map = {
+        pending: ['bg-secondary', 'Beklemede'],
+        processing: ['bg-info text-dark', 'İşleniyor'],
+        completed: ['bg-success', 'Tamamlandı'],
+        cancelled: ['bg-danger', 'İptal'],
+      };
+      const [cls, label] = map[status] || ['bg-secondary', status || 'Bilinmiyor'];
+      return `<span class="badge ${cls}">${label}</span>`;
+    }
+
+    function renderOrderRow(order) {
+      const buyer = escapeHtml(order.buyer_name || order.username || 'Misafir');
+      const method = escapeHtml(order.payment_method_name || '—');
+      const amount = `${Number(order.amount).toFixed(2)} ${escapeHtml(order.currency || '')}`;
+      const reference = order.reference ? `<div class="small text-muted">Ref: ${escapeHtml(order.reference)}</div>` : '';
+      return `
+        <tr data-order-id="${order.id}">
+          <td>
+            <div>${formatDateTime(order.created_at)}</div>
+            ${reference}
+          </td>
+          <td>${buyer}</td>
+          <td>${method}</td>
+          <td>${amount}</td>
+          <td>${order.ki_amount}</td>
+          <td>${formatOrderStatus(order.status)}</td>
+          <td class="text-end">
+            <button class="btn btn-outline-light btn-sm market-order-edit" type="button" data-order-id="${order.id}"><i class="bi bi-pencil"></i> Yönet</button>
+          </td>
+        </tr>`;
+    }
+
+    function syncOrderSelects() {
+      const offerSelect = $('#market-order-offer');
+      const methodSelect = $('#market-order-method');
+      if (offerSelect.length) {
+        const current = offerSelect.val();
+        offerSelect.empty().append('<option value="">Seçim yapın (opsiyonel)</option>');
+        marketOffers.forEach((offer) => {
+          offerSelect.append(`<option value="${offer.id}">${escapeHtml(offer.title)} (${offer.ki_amount} Ki)</option>`);
+        });
+        if (current && offerSelect.find(`option[value="${current}"]`).length) {
+          offerSelect.val(current);
+        }
+      }
+      if (methodSelect.length) {
+        const currentMethod = methodSelect.val();
+        methodSelect.empty().append('<option value="">Seçim yapın</option>');
+        paymentMethods.forEach((method) => {
+          const suffix = Number(method.is_active) ? '' : ' (pasif)';
+          methodSelect.append(`<option value="${method.id}">${escapeHtml(method.name)}${suffix}</option>`);
+        });
+        if (currentMethod && methodSelect.find(`option[value="${currentMethod}"]`).length) {
+          methodSelect.val(currentMethod);
+        }
+      }
+    }
+
     function loadOffers() {
-      tableBody.html('<tr><td colspan="6" class="text-center text-muted">Yükleniyor...</td></tr>');
-      emptyState.addClass('d-none');
+      offerTableBody.html('<tr><td colspan="6" class="text-center text-muted">Yükleniyor...</td></tr>');
+      offerEmptyState.addClass('d-none');
       $.getJSON('api.php', { action: 'list-market-offers' })
         .done(({ data }) => {
-          tableBody.empty();
-          if (!data || !data.length) {
-            emptyState.removeClass('d-none');
+          offerTableBody.empty();
+          marketOffers = data || [];
+          if (!marketOffers.length) {
+            offerEmptyState.removeClass('d-none');
+            syncOrderSelects();
             return;
           }
-          data.forEach((offer) => tableBody.append(renderOfferRow(offer)));
+          marketOffers.forEach((offer) => offerTableBody.append(renderOfferRow(offer)));
+          syncOrderSelects();
         })
         .fail((xhr) => {
-          tableBody.html('<tr><td colspan="6" class="text-center text-danger">Market teklifleri yüklenemedi.</td></tr>');
-          handleError(xhr, message);
+          offerTableBody.html('<tr><td colspan="6" class="text-center text-danger">Market teklifleri yüklenemedi.</td></tr>');
+          handleError(xhr, offerMessage);
         });
     }
 
-    form.on('submit', function (event) {
+    function loadPaymentMethods() {
+      if (!paymentForm.length) {
+        return;
+      }
+      paymentTableBody.html('<tr><td colspan="5" class="text-center text-muted">Yükleniyor...</td></tr>');
+      paymentEmptyState.addClass('d-none');
+      $.getJSON('api.php', { action: 'list-payment-methods' })
+        .done(({ data }) => {
+          paymentTableBody.empty();
+          paymentMethods = data || [];
+          if (!paymentMethods.length) {
+            paymentEmptyState.removeClass('d-none');
+            syncOrderSelects();
+            return;
+          }
+          paymentMethods.forEach((method) => {
+            const badge = method.is_active ? '<span class="badge bg-success bg-opacity-75">Aktif</span>' : '<span class="badge bg-secondary">Pasif</span>';
+            paymentTableBody.append(`
+              <tr data-payment-id="${method.id}">
+                <td>
+                  <div class="fw-semibold">${escapeHtml(method.name)}</div>
+                  <div class="small text-muted">${formatDateTime(method.updated_at || method.created_at)}</div>
+                </td>
+                <td>${escapeHtml(method.method_key)}</td>
+                <td>${badge}</td>
+                <td>${method.sort_order}</td>
+                <td class="text-end">
+                  <div class="btn-group btn-group-sm" role="group">
+                    <button class="btn btn-outline-light payment-method-edit" type="button"><i class="bi bi-pencil"></i></button>
+                    <button class="btn btn-outline-danger payment-method-delete" type="button"><i class="bi bi-trash"></i></button>
+                  </div>
+                </td>
+              </tr>`);
+          });
+          syncOrderSelects();
+        })
+        .fail((xhr) => {
+          paymentTableBody.html('<tr><td colspan="5" class="text-center text-danger">Ödeme yöntemleri yüklenemedi.</td></tr>');
+          handleError(xhr, paymentMessage);
+        });
+    }
+
+    function loadMarketOrders() {
+      if (!orderTableBody.length) {
+        return;
+      }
+      orderTableBody.html('<tr><td colspan="7" class="text-center text-muted">Yükleniyor...</td></tr>');
+      orderEmptyState.addClass('d-none');
+      $.getJSON('api.php', {
+        action: 'list-market-orders',
+        status: orderStatusFilter.val(),
+      })
+        .done(({ data }) => {
+          orderTableBody.empty();
+          if (!data || !data.length) {
+            orderEmptyState.removeClass('d-none');
+            return;
+          }
+          data.forEach((order) => orderTableBody.append(renderOrderRow(order)));
+        })
+        .fail((xhr) => {
+          orderTableBody.html('<tr><td colspan="7" class="text-center text-danger">Siparişler yüklenemedi.</td></tr>');
+          handleError(xhr, orderMessage);
+        });
+    }
+
+    offerForm.on('submit', function (event) {
       event.preventDefault();
-      $.post('api.php?action=save-market-offer', form.serialize())
+      $.post('api.php?action=save-market-offer', offerForm.serialize())
         .done((response) => {
-          showMessage(message, 'success', response.message || 'Teklif kaydedildi.');
-          form.trigger('reset');
+          showMessage(offerMessage, 'success', response.message || 'Teklif kaydedildi.');
+          offerForm.trigger('reset');
           loadOffers();
         })
-        .fail((xhr) => handleError(xhr, message));
+        .fail((xhr) => handleError(xhr, offerMessage));
     });
 
-    tableBody.on('click', '.market-edit', function () {
+    offerTableBody.on('click', '.market-edit', function () {
       const offerId = $(this).closest('tr').data('offer-id');
       if (!offerId) {
         return;
       }
       $('#market-edit-message').empty();
-      $.getJSON('api.php', { action: 'list-market-offers' })
-        .done(({ data }) => {
-          const offer = (data || []).find((item) => Number(item.id) === Number(offerId));
-          if (!offer) {
-            return;
-          }
-          $('#edit-offer-id').val(offer.id);
-          $('#edit-offer-title').val(offer.title);
-          $('#edit-offer-ki').val(offer.ki_amount);
-          $('#edit-offer-price').val(offer.price);
-          $('#edit-offer-currency').val(offer.currency);
-          $('#edit-offer-status').val(String(offer.is_active));
-          editModal?.show();
-        });
+      const offer = marketOffers.find((item) => Number(item.id) === Number(offerId));
+      if (!offer) {
+        return;
+      }
+      $('#edit-offer-id').val(offer.id);
+      $('#edit-offer-title').val(offer.title);
+      $('#edit-offer-ki').val(offer.ki_amount);
+      $('#edit-offer-price').val(offer.price);
+      $('#edit-offer-currency').val(offer.currency);
+      $('#edit-offer-status').val(String(offer.is_active));
+      offerEditModal?.show();
     });
 
     $('#market-edit-form').on('submit', function (event) {
@@ -582,13 +970,129 @@ $(function () {
       $.post('api.php?action=delete-market-offer', { id })
         .done((response) => {
           showMessage(message, 'success', response.message || 'Teklif silindi.');
-          editModal?.hide();
+          offerEditModal?.hide();
           loadOffers();
         })
         .fail((xhr) => handleError(xhr, message));
     });
 
+    paymentForm.on('submit', function (event) {
+      event.preventDefault();
+      $.post('api.php?action=save-payment-method', paymentForm.serialize())
+        .done((response) => {
+          showMessage(paymentMessage, 'success', response.message || 'Ödeme yöntemi kaydedildi.');
+          paymentForm.trigger('reset');
+          $('#payment-method-active').prop('checked', true);
+          loadPaymentMethods();
+        })
+        .fail((xhr) => handleError(xhr, paymentMessage));
+    });
+
+    $('#payment-method-reset').on('click', () => {
+      paymentForm.trigger('reset');
+      $('#payment-method-id').val('');
+      $('#payment-method-active').prop('checked', true);
+      paymentMessage.empty();
+    });
+
+    paymentTableBody.on('click', '.payment-method-edit', function () {
+      const row = $(this).closest('tr');
+      const methodId = row.data('payment-id');
+      const method = paymentMethods.find((item) => Number(item.id) === Number(methodId));
+      if (!method) {
+        return;
+      }
+      paymentMessage.empty();
+      $('#payment-method-id').val(method.id);
+      $('#payment-method-name').val(method.name);
+      $('#payment-method-key').val(method.method_key);
+      $('#payment-method-order').val(method.sort_order);
+      $('#payment-method-active').prop('checked', Number(method.is_active) === 1);
+      $('#payment-method-instructions').val(method.instructions || '');
+    });
+
+    paymentTableBody.on('click', '.payment-method-delete', function () {
+      const methodId = $(this).closest('tr').data('payment-id');
+      if (!methodId || !window.confirm('Bu ödeme yöntemini silmek istediğinize emin misiniz?')) {
+        return;
+      }
+      $.post('api.php?action=delete-payment-method', { id: methodId })
+        .done((response) => {
+          showMessage(paymentMessage, 'success', response.message || 'Ödeme yöntemi silindi.');
+          loadPaymentMethods();
+        })
+        .fail((xhr) => handleError(xhr, paymentMessage));
+    });
+
+    orderStatusFilter.on('change', loadMarketOrders);
+    orderRefreshButton.on('click', loadMarketOrders);
+
+    $('#market-order-modal').on('show.bs.modal', (event) => {
+      orderMessage.empty();
+      const trigger = event.relatedTarget;
+      if (trigger && trigger.dataset && trigger.dataset.orderMode === 'create') {
+        orderForm.trigger('reset');
+        $('#market-order-id').val('');
+        $('#market-order-status-field').val('pending');
+        $('#market-order-currency').val('TRY');
+        orderForm.find('input[type="number"]').filter('[name="amount"]').val('0');
+        orderForm.find('input[type="number"]').filter('[name="ki_amount"]').val('0');
+        syncOrderSelects();
+      }
+    });
+
+    $('#market-order-modal').on('hidden.bs.modal', () => {
+      orderForm.trigger('reset');
+      $('#market-order-id').val('');
+      $('#market-order-status-field').val('pending');
+      $('#market-order-currency').val('TRY');
+      orderMessage.empty();
+    });
+
+    orderTableBody.on('click', '.market-order-edit', function () {
+      const orderId = $(this).data('order-id') || $(this).closest('tr').data('order-id');
+      if (!orderId) {
+        return;
+      }
+      orderMessage.empty();
+      $.getJSON('api.php', { action: 'get-market-order', id: orderId })
+        .done(({ data }) => {
+          syncOrderSelects();
+          $('#market-order-id').val(data.id);
+          $('#market-order-offer').val(data.offer_id ? String(data.offer_id) : '');
+          $('#market-order-method').val(data.payment_method_id ? String(data.payment_method_id) : '');
+          $('#market-order-user').val(data.user_id || '');
+          $('#market-order-status-field').val(data.status || 'pending');
+          $('#market-order-buyer').val(data.buyer_name || '');
+          $('#market-order-email').val(data.buyer_email || '');
+          $('#market-order-amount').val(data.amount || 0);
+          $('#market-order-currency').val(data.currency || '');
+          $('#market-order-ki').val(data.ki_amount || 0);
+          $('#market-order-reference').val(data.reference || '');
+          $('#market-order-notes').val(data.notes || '');
+          orderModal?.show();
+        });
+    });
+
+    orderForm.on('submit', function (event) {
+      event.preventDefault();
+      const action = $('#market-order-id').val() ? 'update-market-order' : 'save-market-order';
+      $.post(`api.php?action=${action}`, orderForm.serialize())
+        .done((response) => {
+          showMessage(orderMessage, 'success', response.message || 'Sipariş kaydedildi.');
+          loadMarketOrders();
+          if (action === 'save-market-order') {
+            orderForm.trigger('reset');
+            $('#market-order-status-field').val('pending');
+            $('#market-order-currency').val('TRY');
+          }
+        })
+        .fail((xhr) => handleError(xhr, orderMessage));
+    });
+
     loadOffers();
+    loadPaymentMethods();
+    loadMarketOrders();
   }
 
   function initSettings() {

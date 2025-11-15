@@ -192,6 +192,39 @@ class Database
             updated_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
 
+        $pdo->exec('CREATE TABLE IF NOT EXISTS payment_methods (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            name VARCHAR(191) NOT NULL,
+            method_key VARCHAR(64) NOT NULL,
+            instructions TEXT NULL,
+            is_active TINYINT(1) NOT NULL DEFAULT 1,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE KEY uniq_payment_method_key (method_key)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS market_orders (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            offer_id INT UNSIGNED NULL,
+            user_id INT UNSIGNED NULL,
+            payment_method_id INT UNSIGNED NULL,
+            buyer_name VARCHAR(191) NULL,
+            buyer_email VARCHAR(191) NULL,
+            amount DECIMAL(10,2) NOT NULL DEFAULT 0,
+            currency VARCHAR(16) NOT NULL DEFAULT "TRY",
+            ki_amount INT UNSIGNED NOT NULL DEFAULT 0,
+            status VARCHAR(32) NOT NULL DEFAULT "pending",
+            reference VARCHAR(191) NULL,
+            notes TEXT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            completed_at DATETIME NULL,
+            CONSTRAINT fk_market_orders_offer FOREIGN KEY (offer_id) REFERENCES market_offers(id) ON DELETE SET NULL,
+            CONSTRAINT fk_market_orders_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+            CONSTRAINT fk_market_orders_payment FOREIGN KEY (payment_method_id) REFERENCES payment_methods(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
         self::ensureColumn($pdo, 'mysql', 'mangas', 'artist', 'VARCHAR(255) NULL');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_unlocks (
@@ -389,6 +422,38 @@ class Database
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS payment_methods (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            method_key TEXT NOT NULL UNIQUE,
+            instructions TEXT,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS market_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            offer_id INTEGER,
+            user_id INTEGER,
+            payment_method_id INTEGER,
+            buyer_name TEXT,
+            buyer_email TEXT,
+            amount REAL NOT NULL DEFAULT 0,
+            currency TEXT NOT NULL DEFAULT "TRY",
+            ki_amount INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT "pending",
+            reference TEXT,
+            notes TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            completed_at TEXT,
+            FOREIGN KEY(offer_id) REFERENCES market_offers(id) ON DELETE SET NULL,
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL,
+            FOREIGN KEY(payment_method_id) REFERENCES payment_methods(id) ON DELETE SET NULL
         )');
 
         self::ensureColumn($pdo, 'sqlite', 'mangas', 'artist', 'TEXT');

@@ -15,7 +15,8 @@
   <?php if (!empty($headerActions)): ?>
     <div class="d-flex flex-wrap gap-2">
       <?php foreach ($headerActions as $action): ?>
-        <a class="btn <?= htmlspecialchars($action['class'] ?? 'btn-outline-light btn-sm') ?>" href="<?= htmlspecialchars($action['href']) ?>">
+        <?php $attributes = trim($action['attributes'] ?? ''); ?>
+        <a class="btn <?= htmlspecialchars($action['class'] ?? 'btn-outline-light btn-sm') ?>" href="<?= htmlspecialchars($action['href']) ?>" <?= $attributes !== '' ? $attributes . ' ' : '' ?>>
           <?php if (!empty($action['icon'])): ?><i class="<?= htmlspecialchars($action['icon']) ?> me-1"></i><?php endif; ?>
           <?= htmlspecialchars($action['label']) ?>
         </a>

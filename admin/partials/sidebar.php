@@ -28,7 +28,6 @@
       <li class="menu-heading">Genel</li>
       <li><a class="menu-link <?= admin_nav_active('index') ?>" href="index.php"><i class="bi bi-speedometer2"></i><span>Gösterge Paneli</span></a></li>
       <li><a class="menu-link <?= admin_nav_active('manga') ?>" href="manga.php"><i class="bi bi-book-half"></i><span>Manga Yönetimi</span></a></li>
-      <li><a class="menu-link <?= admin_nav_active('chapters') ?>" href="chapters.php"><i class="bi bi-collection"></i><span>Bölüm Yönetimi</span></a></li>
       <li><a class="menu-link <?= admin_nav_active('market') ?>" href="market.php"><i class="bi bi-shop"></i><span>Market Yönetimi</span></a></li>
     </ul>
     <ul class="menu-block">
@@ -46,6 +45,7 @@
     <ul class="menu-block">
       <li class="menu-heading">Yapılandırma</li>
       <li><a class="menu-link <?= admin_nav_active('settings') ?>" href="settings.php"><i class="bi bi-gear"></i><span>Site Ayarları</span></a></li>
+      <li><a class="menu-link" href="settings.php#storage-settings"><i class="bi bi-hdd-network"></i><span>FTP Ayarları</span></a></li>
     </ul>
   </nav>
   <div class="sidebar-footer d-flex flex-column gap-2">

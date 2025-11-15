@@ -41,6 +41,11 @@
         iconElement.className = `bi ${icon}`;
       }
     });
+
+    const heroStatus = document.getElementById('hero-theme-status');
+    if (heroStatus) {
+      heroStatus.textContent = nextTheme === 'dark' ? 'Koyu tema aktif' : 'Açık tema aktif';
+    }
   }
 
   function detectInitialTheme() {

@@ -247,6 +247,131 @@ class KiRepository
         return $this->findMarketOffer((int) $this->db->lastInsertId());
     }
 
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPaymentMethods(bool $onlyActive = true): array
+    {
+        $query = 'SELECT * FROM payment_methods';
+        if ($onlyActive) {
+            $query .= ' WHERE is_active = 1';
+        }
+        $query .= ' ORDER BY sort_order ASC, name ASC';
+
+        $stmt = $this->db->query($query);
+
+        return array_map(static function (array $row): array {
+            $row['id'] = (int) $row['id'];
+            $row['is_active'] = (int) $row['is_active'];
+            $row['sort_order'] = (int) $row['sort_order'];
+            return $row;
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function savePaymentMethod(array $data): array
+    {
+        $name = trim((string) ($data['name'] ?? ''));
+        $methodKey = trim((string) ($data['method_key'] ?? ''));
+        $instructions = trim((string) ($data['instructions'] ?? ''));
+        $isActive = !empty($data['is_active']) ? 1 : 0;
+        $sortOrder = (int) ($data['sort_order'] ?? 0);
+        $now = new DateTimeImmutable();
+
+        if ($name === '') {
+            throw new InvalidArgumentException('Ödeme yöntemi adı gereklidir.');
+        }
+
+        if ($methodKey === '') {
+            $methodKey = Slugger::slugify($name);
+        } else {
+            $methodKey = Slugger::slugify($methodKey);
+        }
+
+        $id = isset($data['id']) ? (int) $data['id'] : null;
+        $methodKey = $this->ensureUniquePaymentMethodKey($methodKey, $id);
+
+        if ($id) {
+            $stmt = $this->db->prepare('UPDATE payment_methods SET name = :name, method_key = :key, instructions = :instructions, is_active = :active, sort_order = :sort_order, updated_at = :updated WHERE id = :id');
+            $stmt->execute([
+                ':id' => $id,
+                ':name' => $name,
+                ':key' => $methodKey,
+                ':instructions' => $instructions,
+                ':active' => $isActive,
+                ':sort_order' => $sortOrder,
+                ':updated' => $now->format('Y-m-d H:i:s'),
+            ]);
+
+            return $this->findPaymentMethod($id);
+        }
+
+        $stmt = $this->db->prepare('INSERT INTO payment_methods (name, method_key, instructions, is_active, sort_order, created_at, updated_at) VALUES (:name, :key, :instructions, :active, :sort_order, :created, :updated)');
+        $stmt->execute([
+            ':name' => $name,
+            ':key' => $methodKey,
+            ':instructions' => $instructions,
+            ':active' => $isActive,
+            ':sort_order' => $sortOrder,
+            ':created' => $now->format('Y-m-d H:i:s'),
+            ':updated' => $now->format('Y-m-d H:i:s'),
+        ]);
+
+        return $this->findPaymentMethod((int) $this->db->lastInsertId());
+    }
+
+    public function deletePaymentMethod(int $id): void
+    {
+        $stmt = $this->db->prepare('DELETE FROM payment_methods WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+    }
+
+    public function findPaymentMethod(int $id): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM payment_methods WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $method = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$method) {
+            throw new InvalidArgumentException('Ödeme yöntemi bulunamadı.');
+        }
+
+        $method['id'] = (int) $method['id'];
+        $method['is_active'] = (int) $method['is_active'];
+        $method['sort_order'] = (int) $method['sort_order'];
+
+        return $method;
+    }
+
+    private function ensureUniquePaymentMethodKey(string $key, ?int $ignoreId = null): string
+    {
+        $base = $key !== '' ? $key : 'odeme';
+        $candidate = $base;
+        $suffix = 1;
+
+        while ($this->paymentMethodKeyExists($candidate, $ignoreId)) {
+            $candidate = $base . '-' . $suffix;
+            $suffix++;
+        }
+
+        return $candidate;
+    }
+
+    private function paymentMethodKeyExists(string $key, ?int $ignoreId = null): bool
+    {
+        $query = 'SELECT id FROM payment_methods WHERE method_key = :key';
+        $params = [':key' => $key];
+
+        if ($ignoreId !== null) {
+            $query .= ' AND id != :id';
+            $params[':id'] = $ignoreId;
+        }
+
+        $stmt = $this->db->prepare($query . ' LIMIT 1');
+        $stmt->execute($params);
+
+        return $stmt->fetch(PDO::FETCH_ASSOC) !== false;
+    }
+
     public function deleteMarketOffer(int $id): void
     {
         $stmt = $this->db->prepare('DELETE FROM market_offers WHERE id = :id');
@@ -269,6 +394,181 @@ class KiRepository
         $offer['is_active'] = (int) $offer['is_active'];
 
         return $offer;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listMarketOrders(array $filters = []): array
+    {
+        $query = 'SELECT o.*, mo.title AS offer_title, pm.name AS payment_method_name, u.username AS username'
+            . ' FROM market_orders o'
+            . ' LEFT JOIN market_offers mo ON mo.id = o.offer_id'
+            . ' LEFT JOIN payment_methods pm ON pm.id = o.payment_method_id'
+            . ' LEFT JOIN users u ON u.id = o.user_id';
+
+        $conditions = [];
+        $params = [];
+
+        if (!empty($filters['status']) && is_string($filters['status'])) {
+            $conditions[] = 'o.status = :status';
+            $params[':status'] = $filters['status'];
+        }
+
+        if ($conditions) {
+            $query .= ' WHERE ' . implode(' AND ', $conditions);
+        }
+
+        $query .= ' ORDER BY o.created_at DESC';
+
+        $stmt = $this->db->prepare($query);
+        $stmt->execute($params);
+
+        return array_map(static function (array $row): array {
+            $row['id'] = (int) $row['id'];
+            $row['offer_id'] = isset($row['offer_id']) ? (int) $row['offer_id'] : null;
+            $row['user_id'] = isset($row['user_id']) ? (int) $row['user_id'] : null;
+            $row['payment_method_id'] = isset($row['payment_method_id']) ? (int) $row['payment_method_id'] : null;
+            $row['amount'] = (float) $row['amount'];
+            $row['ki_amount'] = (int) $row['ki_amount'];
+            return $row;
+        }, $stmt->fetchAll(PDO::FETCH_ASSOC));
+    }
+
+    public function createMarketOrder(array $data): array
+    {
+        $offerId = isset($data['offer_id']) ? (int) $data['offer_id'] : null;
+        $userId = isset($data['user_id']) ? (int) $data['user_id'] : null;
+        $paymentMethodId = isset($data['payment_method_id']) ? (int) $data['payment_method_id'] : null;
+        $buyerName = trim((string) ($data['buyer_name'] ?? '')) ?: null;
+        $buyerEmail = trim((string) ($data['buyer_email'] ?? '')) ?: null;
+        $amount = (float) ($data['amount'] ?? 0);
+        $currency = strtoupper(trim((string) ($data['currency'] ?? 'TRY')));
+        $kiAmount = max(0, (int) ($data['ki_amount'] ?? 0));
+        $status = $this->sanitizeOrderStatus($data['status'] ?? 'pending');
+        $reference = trim((string) ($data['reference'] ?? '')) ?: null;
+        $notes = trim((string) ($data['notes'] ?? '')) ?: null;
+        $now = new DateTimeImmutable();
+
+        $offerId = $offerId ?: null;
+        $userId = $userId ?: null;
+        $paymentMethodId = $paymentMethodId ?: null;
+
+        $completedAt = null;
+        if ($status === 'completed') {
+            $completedAt = $now->format('Y-m-d H:i:s');
+        }
+
+        $stmt = $this->db->prepare('INSERT INTO market_orders (offer_id, user_id, payment_method_id, buyer_name, buyer_email, amount, currency, ki_amount, status, reference, notes, created_at, updated_at, completed_at) VALUES (:offer_id, :user_id, :payment_method_id, :buyer_name, :buyer_email, :amount, :currency, :ki_amount, :status, :reference, :notes, :created_at, :updated_at, :completed_at)');
+        $stmt->execute([
+            ':offer_id' => $offerId,
+            ':user_id' => $userId,
+            ':payment_method_id' => $paymentMethodId,
+            ':buyer_name' => $buyerName,
+            ':buyer_email' => $buyerEmail,
+            ':amount' => $amount,
+            ':currency' => $currency,
+            ':ki_amount' => $kiAmount,
+            ':status' => $status,
+            ':reference' => $reference,
+            ':notes' => $notes,
+            ':created_at' => $now->format('Y-m-d H:i:s'),
+            ':updated_at' => $now->format('Y-m-d H:i:s'),
+            ':completed_at' => $completedAt,
+        ]);
+
+        $orderId = (int) $this->db->lastInsertId();
+
+        if ($status === 'completed' && $userId && $kiAmount > 0) {
+            $this->adjustBalance($userId, $kiAmount, 'market_purchase', 'Market satın alımı', ['order_id' => $orderId]);
+        }
+
+        return $this->findMarketOrder($orderId);
+    }
+
+    public function updateMarketOrder(int $id, array $data): array
+    {
+        $existing = $this->findMarketOrder($id);
+
+        $offerId = isset($data['offer_id']) ? (int) $data['offer_id'] : ($existing['offer_id'] ?? null);
+        $userId = isset($data['user_id']) ? (int) $data['user_id'] : ($existing['user_id'] ?? null);
+        $paymentMethodId = isset($data['payment_method_id']) ? (int) $data['payment_method_id'] : ($existing['payment_method_id'] ?? null);
+        $buyerName = trim((string) ($data['buyer_name'] ?? $existing['buyer_name'] ?? '')) ?: null;
+        $buyerEmail = trim((string) ($data['buyer_email'] ?? $existing['buyer_email'] ?? '')) ?: null;
+        $amount = isset($data['amount']) ? (float) $data['amount'] : (float) $existing['amount'];
+        $currency = isset($data['currency']) ? strtoupper(trim((string) $data['currency'])) : ($existing['currency'] ?? 'TRY');
+        $kiAmount = isset($data['ki_amount']) ? max(0, (int) $data['ki_amount']) : (int) $existing['ki_amount'];
+        $status = $this->sanitizeOrderStatus($data['status'] ?? $existing['status']);
+        $reference = trim((string) ($data['reference'] ?? $existing['reference'] ?? '')) ?: null;
+        $notes = trim((string) ($data['notes'] ?? $existing['notes'] ?? '')) ?: null;
+        $now = new DateTimeImmutable();
+
+        $offerId = $offerId ?: null;
+        $userId = $userId ?: null;
+        $paymentMethodId = $paymentMethodId ?: null;
+
+        $completedAt = $existing['completed_at'] ?? null;
+        $shouldCredit = false;
+        if ($status === 'completed' && $existing['status'] !== 'completed') {
+            $completedAt = $now->format('Y-m-d H:i:s');
+            $shouldCredit = true;
+        }
+
+        if ($status !== 'completed') {
+            $completedAt = null;
+        }
+
+        $stmt = $this->db->prepare('UPDATE market_orders SET offer_id = :offer_id, user_id = :user_id, payment_method_id = :payment_method_id, buyer_name = :buyer_name, buyer_email = :buyer_email, amount = :amount, currency = :currency, ki_amount = :ki_amount, status = :status, reference = :reference, notes = :notes, updated_at = :updated, completed_at = :completed_at WHERE id = :id');
+        $stmt->execute([
+            ':id' => $id,
+            ':offer_id' => $offerId,
+            ':user_id' => $userId,
+            ':payment_method_id' => $paymentMethodId,
+            ':buyer_name' => $buyerName,
+            ':buyer_email' => $buyerEmail,
+            ':amount' => $amount,
+            ':currency' => $currency,
+            ':ki_amount' => $kiAmount,
+            ':status' => $status,
+            ':reference' => $reference,
+            ':notes' => $notes,
+            ':updated' => $now->format('Y-m-d H:i:s'),
+            ':completed_at' => $completedAt,
+        ]);
+
+        if ($shouldCredit && $userId && $kiAmount > 0) {
+            $this->adjustBalance($userId, $kiAmount, 'market_purchase', 'Market satın alımı', ['order_id' => $id]);
+        }
+
+        return $this->findMarketOrder($id);
+    }
+
+    public function findMarketOrder(int $id): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM market_orders WHERE id = :id');
+        $stmt->execute([':id' => $id]);
+        $order = $stmt->fetch(PDO::FETCH_ASSOC);
+
+        if (!$order) {
+            throw new InvalidArgumentException('Sipariş bulunamadı.');
+        }
+
+        $order['id'] = (int) $order['id'];
+        $order['offer_id'] = isset($order['offer_id']) ? (int) $order['offer_id'] : null;
+        $order['user_id'] = isset($order['user_id']) ? (int) $order['user_id'] : null;
+        $order['payment_method_id'] = isset($order['payment_method_id']) ? (int) $order['payment_method_id'] : null;
+        $order['amount'] = (float) $order['amount'];
+        $order['ki_amount'] = (int) $order['ki_amount'];
+
+        return $order;
+    }
+
+    private function sanitizeOrderStatus(string $status): string
+    {
+        $status = strtolower(trim($status));
+        $allowed = ['pending', 'processing', 'completed', 'cancelled'];
+
+        return in_array($status, $allowed, true) ? $status : 'pending';
     }
 
     public function getTransactions(int $userId, int $limit = 50): array
