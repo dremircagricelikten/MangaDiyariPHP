@@ -145,6 +145,13 @@ try {
             ]);
             echo json_encode(['data' => $chapters]);
             break;
+        case 'reading-history':
+            requireLogin();
+            $limit = isset($_GET['limit']) ? (int) $_GET['limit'] : 10;
+            $limit = $limit > 0 ? min($limit, 50) : 10;
+            $history = $readingRepo->getUserHistory((int) $currentUserId, $limit);
+            echo json_encode(['data' => $history]);
+            break;
         case 'widgets':
             $widgets = $widgetRepo->getActive();
             echo json_encode(['data' => $widgets]);
