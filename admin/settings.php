@@ -72,7 +72,7 @@ $defaultStorage = $allSettings['chapter_storage_driver'] ?? 'local';
             </form>
           </section>
 
-          <section class="admin-section">
+          <section class="admin-section" id="storage-settings">
             <div class="admin-section-header">
               <div>
                 <span class="eyebrow">Depolama</span>

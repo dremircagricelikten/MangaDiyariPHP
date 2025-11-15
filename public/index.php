@@ -142,6 +142,13 @@ $siteStats = [
                 <span class="hero-stat__value"><?= number_format($siteStats['active_members']) ?></span>
               </div>
             </div>
+            <div class="d-flex align-items-center gap-2 mt-3">
+              <button class="btn btn-outline-light btn-sm" type="button" data-theme-toggle data-track="hero-theme-toggle">
+                <i class="bi bi-moon-stars"></i>
+                <span class="ms-1 d-none d-md-inline">Temayı Değiştir</span>
+              </button>
+              <span class="text-muted small" id="hero-theme-status">Koyu tema aktif</span>
+            </div>
           </div>
           <div class="col-xl-7">
             <?php $heroWidgets = $widgetsByArea['hero'] ?? []; ?>
