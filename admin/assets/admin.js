@@ -1149,6 +1149,7 @@ $(function () {
     const siteMessage = $('#site-settings-message');
     const storageForm = $('#storage-settings-form');
     const storageMessage = $('#storage-settings-message');
+    const storageTestButton = $('#storage-test-ftp');
     const smtpForm = $('#smtp-settings-form');
     const smtpMessage = $('#smtp-settings-message');
 
@@ -1178,6 +1179,32 @@ $(function () {
           showMessage(storageMessage, 'success', response.message || 'Depolama ayarları güncellendi.');
         })
         .fail((xhr) => handleError(xhr, storageMessage));
+    });
+
+    storageTestButton.on('click', function () {
+      const button = $(this);
+      const spinner = button.find('.spinner-border');
+      const label = button.find('.button-label');
+      button.prop('disabled', true);
+      spinner.removeClass('d-none');
+      label.css('opacity', 0.6);
+      $.post('api.php?action=test-ftp-connection', storageForm.serialize())
+        .done((response) => {
+          const summary = response.data?.summary
+            ? `<div class="mt-2 small">${response.data.summary}</div>`
+            : '';
+          showMessage(
+            storageMessage,
+            'success',
+            `${response.message || 'FTP bağlantısı başarılı.'}${summary}`
+          );
+        })
+        .fail((xhr) => handleError(xhr, storageMessage))
+        .always(() => {
+          button.prop('disabled', false);
+          spinner.addClass('d-none');
+          label.css('opacity', 1);
+        });
     });
 
     smtpForm.on('submit', function (event) {
@@ -1731,6 +1758,11 @@ $(function () {
     const userTableBody = $('#user-table tbody');
     const createUserForm = $('#create-user-form');
     const createUserMessage = $('#create-user-message');
+    const userRoleFilter = $('#user-role-filter');
+    const userStatusFilter = $('#user-status-filter');
+    const userSortSelect = $('#user-sort');
+    const userSearchInput = $('#user-search');
+    const userSummary = $('#user-summary');
     const adForm = $('#ad-form');
     const adMessage = $('#ad-form-message');
     const roleForm = $('#role-form');
@@ -1744,16 +1776,55 @@ $(function () {
     const roleCapabilitiesField = $('#role-capabilities');
     const roleOrderField = $('#role-order');
     const roleSubmitButton = roleForm.find('button[type="submit"]');
+    const userDetailDrawerEl = document.getElementById('user-detail-drawer');
+    const userDetailForm = $('#user-detail-form');
+    const userDetailMessage = $('#user-detail-message');
+    const userDetailMeta = $('#user-detail-meta');
+    const userDetailTitle = $('#user-detail-title');
+    const userDetailIdField = $('#user-detail-id');
+    const userDetailUsernameField = $('#user-detail-username');
+    const userDetailEmailField = $('#user-detail-email');
+    const userDetailAvatarField = $('#user-detail-avatar');
+    const userDetailWebsiteField = $('#user-detail-website');
+    const userDetailKiField = $('#user-detail-ki');
+    const userDetailBioField = $('#user-detail-bio');
+    const userDetailOffcanvas =
+      userDetailDrawerEl && typeof bootstrap !== 'undefined'
+        ? new bootstrap.Offcanvas(userDetailDrawerEl)
+        : null;
     let roles = [];
     let roleMap = {};
     let rolesLoaded = false;
+    let allUsers = [];
+    let userSearchTimer = null;
+
+    const capabilityDescriptions = {
+      manage_site: 'Site ayarlarını ve temayı yönetir.',
+      manage_users: 'Üyeleri yönetir, roller atar.',
+      manage_content: 'Manga, bölüm ve yazıları düzenler.',
+      manage_comments: 'Yorum moderasyonu yapar.',
+      manage_media: 'Medya kitaplığını yönetir.',
+      manage_market: 'Ki pazarı ve siparişleri yönetir.',
+      manage_integrations: 'Entegrasyonlar ve API anahtarlarını yönetir.',
+      read: 'Sadece okuma ve topluluk erişimi sağlar.',
+    };
+    const numberFormatter = new Intl.NumberFormat('tr-TR');
+
+    function parseDate(value) {
+      const timestamp = Date.parse(value || '');
+      return Number.isNaN(timestamp) ? 0 : timestamp;
+    }
 
     function renderCapabilities(capabilities) {
       if (!Array.isArray(capabilities) || !capabilities.length) {
         return '<span class="text-muted">—</span>';
       }
       return capabilities
-        .map((capability) => `<span class="badge bg-secondary bg-opacity-50 text-uppercase me-1 mb-1">${escapeHtml(capability)}</span>`)
+        .map((capability) => {
+          const hint = capabilityDescriptions[capability] || '';
+          const title = hint ? ` title="${escapeHtml(hint)}"` : '';
+          return `<span class="badge badge-capability"${title}>${escapeHtml(capability)}</span>`;
+        })
         .join('');
     }
 
@@ -1773,6 +1844,19 @@ $(function () {
         select.val('member');
       } else if (roles[0]) {
         select.val(roles[0].role_key);
+      }
+
+      if (userRoleFilter.length) {
+        const current = userRoleFilter.val();
+        userRoleFilter.empty().append('<option value="">Tümü</option>');
+        roles.forEach((role) => {
+          userRoleFilter.append(
+            `<option value="${escapeHtml(role.role_key)}">${escapeHtml(role.label)}</option>`
+          );
+        });
+        if (current && roleMap[current]) {
+          userRoleFilter.val(current);
+        }
       }
     }
 
@@ -1822,8 +1906,8 @@ $(function () {
     function renderUserRow(user) {
       const initial = (user.username || '?').charAt(0).toUpperCase();
       const avatar = user.avatar_url
-        ? `<img src="${user.avatar_url}" alt="${escapeHtml(user.username)}" class="rounded-circle me-2" width="36" height="36">`
-        : `<div class="avatar-placeholder rounded-circle me-2">${initial}</div>`;
+        ? `<img src="${user.avatar_url}" alt="${escapeHtml(user.username)}" class="rounded-circle me-3" width="44" height="44">`
+        : `<div class="avatar-placeholder me-3">${initial}</div>`;
       const active = Number(user.is_active) === 1;
       const roleKey = user.role && roleMap[user.role] ? user.role : user.role || (roleMap.member ? 'member' : roles[0]?.role_key || '');
       let options = roles
@@ -1835,36 +1919,219 @@ $(function () {
         options += `<option value="${escapeHtml(roleKey)}" selected>${escapeHtml(user.role_label || roleKey)}</option>`;
       }
       const capabilitiesHtml = renderCapabilities(roleMap[roleKey]?.capabilities || user.role_capabilities || []);
+      const joinedAt = formatDateTime(user.created_at) || '—';
+      const updatedAt = formatDateTime(user.updated_at) || '—';
+      const kiBalance = numberFormatter.format(Number(user.ki_balance || 0));
+      const roleLabel = roleMap[roleKey]?.label || user.role_label || roleKey;
+      const statusLabel = active ? 'Aktif' : 'Pasif';
+      const emailLink = user.email
+        ? `<a href="mailto:${encodeURIComponent(user.email)}"><i class="bi bi-envelope"></i> ${escapeHtml(user.email)}</a>`
+        : '';
+      const websiteLink = user.website_url
+        ? `<a href="${escapeHtml(user.website_url)}" target="_blank" rel="noopener"><i class="bi bi-link-45deg"></i> ${escapeHtml(user.website_url)}</a>`
+        : '';
+      const contactLinks = [emailLink, websiteLink].filter(Boolean);
+      const metaHtml = [
+        `<span><i class="bi bi-person-badge"></i> ${escapeHtml(roleLabel)}</span>`,
+        `<span><i class="bi bi-calendar-plus"></i> ${joinedAt}</span>`,
+        `<span><i class="bi bi-clock-history"></i> ${updatedAt}</span>`,
+        `<span><i class="bi bi-gem"></i> ${kiBalance}</span>`,
+        `<span><i class="bi bi-activity"></i> ${statusLabel}</span>`,
+      ].join('');
+      const bioHtml = user.bio ? `<p class="user-card__bio">${escapeHtml(truncate(user.bio, 160))}</p>` : '';
+      const contactHtml = contactLinks.length ? `<div class="user-card__links">${contactLinks.join('')}</div>` : '';
       return `
         <tr data-user-id="${user.id}">
           <td>
-            <div class="d-flex align-items-center">
-              ${avatar}
-              <div>
-                <div class="fw-semibold">${escapeHtml(user.username)}</div>
-                <div class="small text-muted">${escapeHtml(user.email)}</div>
+            <div class="user-card">
+              <div class="user-card__header">
+                ${avatar}
+                <div class="user-card__details">
+                  <div class="fw-semibold">${escapeHtml(user.username)}</div>
+                  <div class="small text-muted">${escapeHtml(user.email)}</div>
+                </div>
               </div>
+              <div class="user-card__meta">${metaHtml}</div>
+              ${bioHtml}
+              ${contactHtml}
             </div>
           </td>
           <td>
-            <select class="form-select form-select-sm user-role">
-              ${options}
-            </select>
-            <div class="user-role-capabilities mt-2">${capabilitiesHtml}</div>
+            <div class="vstack gap-2">
+              <select class="form-select form-select-sm user-role">
+                ${options}
+              </select>
+              <div class="user-role-capabilities">${capabilitiesHtml}</div>
+            </div>
           </td>
           <td class="text-center">
             <div class="form-check form-switch d-flex justify-content-center">
               <input class="form-check-input user-active" type="checkbox" ${active ? 'checked' : ''}>
             </div>
+            <div class="small text-muted mt-1 user-status-label">${active ? 'Aktif' : 'Pasif'}</div>
           </td>
           <td>
-            <div class="input-group input-group-sm">
-              <input type="password" class="form-control user-password" placeholder="Yeni parola">
-              <button class="btn btn-outline-light user-save" type="button">Kaydet</button>
+            <div class="user-quick-actions">
+              <div class="input-group input-group-sm flex-nowrap">
+                <input type="password" class="form-control user-password" placeholder="Yeni parola">
+                <button class="btn btn-outline-light user-save" type="button">Kaydet</button>
+              </div>
+              <div class="d-flex flex-wrap gap-2">
+                <button class="btn btn-outline-secondary btn-sm user-open-details" type="button">
+                  <i class="bi bi-person-lines-fill me-1"></i>Detayları Aç
+                </button>
+              </div>
+              <div class="user-message small text-muted mt-2"></div>
             </div>
-            <div class="user-message small mt-1 text-muted"></div>
           </td>
         </tr>`;
+    }
+
+    function resetUserDetailForm() {
+      if (!userDetailForm.length) {
+        return;
+      }
+      userDetailForm[0].reset();
+      userDetailIdField.val('');
+      userDetailMeta.empty();
+      userDetailMessage.empty();
+      if (userDetailTitle.length) {
+        userDetailTitle.text('Üye Detayları');
+      }
+    }
+
+    function populateUserDetail(user) {
+      if (!userDetailForm.length) {
+        return;
+      }
+      userDetailIdField.val(user.id || '');
+      userDetailUsernameField.val(user.username || '');
+      userDetailEmailField.val(user.email || '');
+      userDetailAvatarField.val(user.avatar_url || '');
+      userDetailWebsiteField.val(user.website_url || '');
+      userDetailKiField.val(Math.max(0, Number(user.ki_balance ?? 0)));
+      userDetailBioField.val(user.bio || '');
+      if (userDetailTitle.length) {
+        const identifier = user.username ? `${user.username} (#${user.id})` : `Üye #${user.id}`;
+        userDetailTitle.text(identifier);
+      }
+      if (userDetailMeta.length) {
+        const created = formatDateTime(user.created_at) || '—';
+        const updated = formatDateTime(user.updated_at) || '—';
+        const roleKey = user.role && roleMap[user.role] ? user.role : user.role || '';
+        const roleLabel = roleKey ? roleMap[roleKey]?.label || user.role_label || roleKey : '—';
+        const statusLabel = Number(user.is_active) === 1 ? 'Aktif' : 'Pasif';
+        userDetailMeta.html(`
+          <span><i class="bi bi-person-badge"></i> ${escapeHtml(roleLabel)}</span>
+          <span><i class="bi bi-calendar-plus"></i> ${created}</span>
+          <span><i class="bi bi-clock-history"></i> ${updated}</span>
+          <span><i class="bi bi-activity"></i> ${statusLabel}</span>
+        `);
+      }
+    }
+
+    function openUserDetail(userId) {
+      if (!userDetailForm.length) {
+        return;
+      }
+      resetUserDetailForm();
+      if (userDetailMeta.length) {
+        userDetailMeta.html('<span class="text-muted"><i class="bi bi-arrow-repeat"></i> Yükleniyor...</span>');
+      }
+      if (userDetailOffcanvas) {
+        userDetailOffcanvas.show();
+      }
+      $.getJSON('api.php', { action: 'get-user', id: userId })
+        .done(({ data }) => {
+          if (!data) {
+            showMessage(userDetailMessage, 'danger', 'Kullanıcı bulunamadı.');
+            return;
+          }
+          populateUserDetail(data);
+          const index = allUsers.findIndex((item) => Number(item.id) === Number(userId));
+          if (index !== -1) {
+            allUsers[index] = { ...allUsers[index], ...data };
+            renderUsers();
+          }
+        })
+        .fail((xhr) => handleError(xhr, userDetailMessage));
+    }
+
+    function applyUserFilters(list) {
+      const roleFilter = userRoleFilter.length ? (userRoleFilter.val() || '').toString() : '';
+      const statusFilter = userStatusFilter.length ? (userStatusFilter.val() || '').toString() : '';
+      const query = userSearchInput.length ? (userSearchInput.val() || '').toLowerCase().trim() : '';
+      return list.filter((user) => {
+        const normalizedRole = (user.role || '').toLowerCase();
+        if (roleFilter && normalizedRole !== roleFilter.toLowerCase()) {
+          return false;
+        }
+        if (statusFilter === 'active' && Number(user.is_active) !== 1) {
+          return false;
+        }
+        if (statusFilter === 'inactive' && Number(user.is_active) === 1) {
+          return false;
+        }
+        if (query) {
+          const username = (user.username || '').toLowerCase();
+          const email = (user.email || '').toLowerCase();
+          if (!username.includes(query) && !email.includes(query)) {
+            return false;
+          }
+        }
+        return true;
+      });
+    }
+
+    function sortUsers(list) {
+      const sort = userSortSelect.length ? userSortSelect.val() : 'newest';
+      const copy = [...list];
+      copy.sort((a, b) => {
+        switch (sort) {
+          case 'oldest':
+            return parseDate(a.created_at) - parseDate(b.created_at);
+          case 'name':
+            return (a.username || '').localeCompare(b.username || '', 'tr');
+          case 'ki':
+            return Number(b.ki_balance || 0) - Number(a.ki_balance || 0);
+          default:
+            return parseDate(b.created_at) - parseDate(a.created_at);
+        }
+      });
+      return copy;
+    }
+
+    function updateUserSummary(filtered) {
+      if (!userSummary.length) {
+        return;
+      }
+      const summaryData = {
+        total: allUsers.length,
+        active: allUsers.filter((user) => Number(user.is_active) === 1).length,
+        staff: allUsers.filter((user) => (user.role || '') !== 'member' && (user.role || '') !== '').length,
+        filtered: filtered.length,
+      };
+      Object.entries(summaryData).forEach(([key, value]) => {
+        const target = userSummary.find(`[data-summary="${key}"] .user-stat__value`);
+        if (target.length) {
+          target.text(numberFormatter.format(value));
+        }
+      });
+    }
+
+    function renderUsers() {
+      const filtered = sortUsers(applyUserFilters(allUsers));
+      userTableBody.empty();
+      if (!filtered.length) {
+        const message = allUsers.length
+          ? 'Filtreye uyan üye bulunamadı.'
+          : 'Henüz üye bulunmuyor.';
+        userTableBody.html(`<tr><td colspan="4" class="text-center text-muted">${message}</td></tr>`);
+        updateUserSummary(filtered);
+        return;
+      }
+      filtered.forEach((user) => userTableBody.append(renderUserRow(user)));
+      updateUserSummary(filtered);
     }
 
     function loadUsers() {
@@ -1875,16 +2142,30 @@ $(function () {
       userTableBody.html('<tr><td colspan="4" class="text-center text-muted">Yükleniyor...</td></tr>');
       $.getJSON('api.php', { action: 'list-users' })
         .done(({ data }) => {
-          userTableBody.empty();
-          if (!data || !data.length) {
-            userTableBody.html('<tr><td colspan="4" class="text-center text-muted">Henüz üye bulunmuyor.</td></tr>');
-            return;
-          }
-          data.forEach((user) => userTableBody.append(renderUserRow(user)));
+          allUsers = Array.isArray(data) ? data : [];
+          renderUsers();
         })
         .fail(() => {
           userTableBody.html('<tr><td colspan="4" class="text-center text-danger">Üyeler yüklenemedi.</td></tr>');
+          allUsers = [];
+          updateUserSummary([]);
         });
+    }
+
+    if (userRoleFilter.length) {
+      userRoleFilter.on('change', renderUsers);
+    }
+    if (userStatusFilter.length) {
+      userStatusFilter.on('change', renderUsers);
+    }
+    if (userSortSelect.length) {
+      userSortSelect.on('change', renderUsers);
+    }
+    if (userSearchInput.length) {
+      userSearchInput.on('input', () => {
+        clearTimeout(userSearchTimer);
+        userSearchTimer = setTimeout(renderUsers, 250);
+      });
     }
 
     function resetRoleForm() {
@@ -1927,9 +2208,33 @@ $(function () {
         password,
       })
         .done((response) => {
-          message.addClass('text-success').text(response.message || 'Üye güncellendi.');
-          row.find('.user-password').val('');
-          row.find('.user-role-capabilities').html(renderCapabilities(roleMap[role]?.capabilities || []));
+          const updated = response.user || null;
+          const index = allUsers.findIndex((item) => Number(item.id) === Number(userId));
+          if (index === -1) {
+            loadUsers();
+            refreshDashboardStats();
+            return;
+          }
+          if (index !== -1) {
+            const nextRole = updated?.role ?? role;
+            const normalized = {
+              ...allUsers[index],
+              ...updated,
+              role: nextRole,
+              is_active: updated?.is_active ?? isActive,
+              role_label: roleMap[nextRole]?.label || updated?.role_label || allUsers[index].role_label || nextRole,
+              role_capabilities: roleMap[nextRole]?.capabilities || updated?.role_capabilities || allUsers[index].role_capabilities || [],
+            };
+            allUsers[index] = normalized;
+          }
+          renderUsers();
+          const refreshedRow = userTableBody.find(`tr[data-user-id="${userId}"]`);
+          refreshedRow.find('.user-password').val('');
+          refreshedRow
+            .find('.user-message')
+            .removeClass('text-danger')
+            .addClass('text-success')
+            .text(response.message || 'Üye güncellendi.');
           refreshDashboardStats();
         })
         .fail((xhr) => {
@@ -1940,6 +2245,19 @@ $(function () {
           const error = xhr.responseJSON?.error || 'Güncelleme başarısız';
           message.addClass('text-danger').text(error);
         });
+    });
+
+    userTableBody.on('click', '.user-open-details', function () {
+      const userId = Number($(this).closest('tr').data('user-id'));
+      if (!userId) {
+        return;
+      }
+      openUserDetail(userId);
+    });
+
+    userTableBody.on('change', '.user-active', function () {
+      const label = $(this).closest('td').find('.user-status-label');
+      label.text(this.checked ? 'Aktif' : 'Pasif');
     });
 
     userTableBody.on('change', '.user-role', function () {
@@ -2007,6 +2325,49 @@ $(function () {
           loadRoles(loadUsers);
         })
         .fail((xhr) => handleError(xhr, roleMessage));
+    });
+
+    if (userDetailDrawerEl) {
+      userDetailDrawerEl.addEventListener('hidden.bs.offcanvas', () => {
+        resetUserDetailForm();
+      });
+    }
+
+    userDetailForm.on('submit', function (event) {
+      event.preventDefault();
+      if (!userDetailForm.length) {
+        return;
+      }
+      const submitButton = userDetailForm.find('button[type="submit"]');
+      submitButton.prop('disabled', true);
+      $.post('api.php?action=update-user-profile', userDetailForm.serialize())
+        .done((response) => {
+          showMessage(userDetailMessage, 'success', response.message || 'Üye profili güncellendi.');
+          const updated = response.user || null;
+          if (updated) {
+            const index = allUsers.findIndex((item) => Number(item.id) === Number(updated.id));
+            const nextRole = updated.role || allUsers[index]?.role || '';
+            const normalized = {
+              ...(index !== -1 ? allUsers[index] : {}),
+              ...updated,
+              role: nextRole,
+              role_label: roleMap[nextRole]?.label || updated.role_label || allUsers[index]?.role_label || nextRole,
+              role_capabilities: roleMap[nextRole]?.capabilities || updated.role_capabilities || allUsers[index]?.role_capabilities || [],
+            };
+            if (index !== -1) {
+              allUsers[index] = normalized;
+            } else {
+              allUsers.push(normalized);
+            }
+            renderUsers();
+            populateUserDetail(normalized);
+            refreshDashboardStats();
+          }
+        })
+        .fail((xhr) => handleError(xhr, userDetailMessage))
+        .always(() => {
+          submitButton.prop('disabled', false);
+        });
     });
 
     function loadAdSettings() {

@@ -75,14 +75,65 @@ $headerActions = [
                 <p class="text-muted mb-0">Üyelerin rol, durum ve parolalarını hızla güncelleyin.</p>
               </div>
             </div>
+            <div class="card glass-card mb-4" id="user-insights">
+              <div class="card-body">
+                <div class="row g-3 align-items-end">
+                  <div class="col-md-3">
+                    <label class="form-label">Rol Filtresi</label>
+                    <select class="form-select form-select-sm" id="user-role-filter">
+                      <option value="">Tümü</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Durum</label>
+                    <select class="form-select form-select-sm" id="user-status-filter">
+                      <option value="">Tümü</option>
+                      <option value="active">Aktif</option>
+                      <option value="inactive">Pasif</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Sıralama</label>
+                    <select class="form-select form-select-sm" id="user-sort">
+                      <option value="newest">En Yeni Üyeler</option>
+                      <option value="oldest">En Eski Üyeler</option>
+                      <option value="name">Alfabetik</option>
+                      <option value="ki">Ki Bakiyesi</option>
+                    </select>
+                  </div>
+                  <div class="col-md-3">
+                    <label class="form-label">Ara</label>
+                    <input type="search" class="form-control form-control-sm" id="user-search" placeholder="İsim veya e-posta ile ara">
+                  </div>
+                </div>
+                <div class="user-stats mt-4" id="user-summary">
+                  <div class="user-stat" data-summary="total">
+                    <span class="user-stat__label">Toplam Üye</span>
+                    <span class="user-stat__value">0</span>
+                  </div>
+                  <div class="user-stat" data-summary="active">
+                    <span class="user-stat__label">Aktif</span>
+                    <span class="user-stat__value">0</span>
+                  </div>
+                  <div class="user-stat" data-summary="staff">
+                    <span class="user-stat__label">Ekip Üyeleri</span>
+                    <span class="user-stat__value">0</span>
+                  </div>
+                  <div class="user-stat" data-summary="filtered">
+                    <span class="user-stat__label">Filtre Sonucu</span>
+                    <span class="user-stat__value">0</span>
+                  </div>
+                </div>
+              </div>
+            </div>
             <div class="table-responsive">
               <table class="table table-dark table-hover align-middle" id="user-table">
                 <thead>
                   <tr>
                     <th scope="col">Üye</th>
-                    <th scope="col">Rol</th>
+                    <th scope="col">Rol / Yetkiler</th>
                     <th scope="col" class="text-center">Durum</th>
-                    <th scope="col">Parola</th>
+                    <th scope="col">Hızlı İşlemler</th>
                   </tr>
                 </thead>
                 <tbody></tbody>
@@ -149,6 +200,20 @@ $headerActions = [
                       </table>
                     </div>
                     <div id="role-table-empty" class="empty-state d-none">Henüz özel rol tanımlanmadı.</div>
+                    <hr class="text-secondary my-4">
+                    <div class="capability-guide">
+                      <h4 class="h6 text-uppercase text-muted mb-3">Yaygın Yetki Açıklamaları</h4>
+                      <ul class="capability-guide__list">
+                        <li><span class="badge badge-capability">manage_site</span> Site ayarları ve temayı yönetebilir.</li>
+                        <li><span class="badge badge-capability">manage_users</span> Üyeleri düzenleyebilir, yeni roller atayabilir.</li>
+                        <li><span class="badge badge-capability">manage_content</span> Manga, bölüm ve gönderileri oluşturup yayınlayabilir.</li>
+                        <li><span class="badge badge-capability">manage_comments</span> Yorumları onaylayabilir, silebilir veya geri yükleyebilir.</li>
+                        <li><span class="badge badge-capability">manage_media</span> Medya kitaplığındaki dosyaları yükleyebilir veya silebilir.</li>
+                        <li><span class="badge badge-capability">manage_market</span> Ki pazarı ve siparişleri yönetebilir.</li>
+                        <li><span class="badge badge-capability">manage_integrations</span> Entegrasyonlar ve API anahtarlarını yapılandırabilir.</li>
+                        <li><span class="badge badge-capability">read</span> Sadece okuma ve topluluk erişimi sağlar.</li>
+                      </ul>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -190,6 +255,54 @@ $headerActions = [
         </main>
       </div>
     </div>
+    <div class="offcanvas offcanvas-end admin-offcanvas" tabindex="-1" id="user-detail-drawer" aria-labelledby="user-detail-title">
+      <div class="offcanvas-header">
+        <div>
+          <h5 class="offcanvas-title" id="user-detail-title">Üye Detayları</h5>
+          <p class="offcanvas-subtitle text-muted mb-0">Profil, iletişim ve topluluk bilgilerini düzenleyin.</p>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Kapat"></button>
+      </div>
+      <div class="offcanvas-body">
+        <form id="user-detail-form" class="vstack gap-4">
+          <input type="hidden" name="id" id="user-detail-id">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label" for="user-detail-username">Kullanıcı Adı</label>
+              <input type="text" class="form-control" name="username" id="user-detail-username" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="user-detail-email">E-posta</label>
+              <input type="email" class="form-control" name="email" id="user-detail-email" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="user-detail-avatar">Avatar URL</label>
+              <input type="url" class="form-control" name="avatar_url" id="user-detail-avatar" placeholder="https://...">
+              <div class="form-text">Boş bırakılırsa mevcut avatar korunur.</div>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label" for="user-detail-website">Web Sitesi</label>
+              <input type="url" class="form-control" name="website_url" id="user-detail-website" placeholder="https://...">
+            </div>
+            <div class="col-md-4">
+              <label class="form-label" for="user-detail-ki">Ki Bakiyesi</label>
+              <input type="number" class="form-control" name="ki_balance" id="user-detail-ki" min="0" step="1">
+            </div>
+            <div class="col-12">
+              <label class="form-label" for="user-detail-bio">Kısa Biyografi</label>
+              <textarea class="form-control" name="bio" id="user-detail-bio" rows="4" placeholder="Üyenin biyografisi"></textarea>
+            </div>
+          </div>
+          <div id="user-detail-meta" class="user-detail-meta small text-muted"></div>
+          <div id="user-detail-message"></div>
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-3">
+            <div class="small text-muted">Kaydedilen değişiklikler topluluk listesine anında yansır.</div>
+            <button class="btn btn-primary" type="submit"><i class="bi bi-save me-1"></i>Değişiklikleri Kaydet</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/admin.js"></script>

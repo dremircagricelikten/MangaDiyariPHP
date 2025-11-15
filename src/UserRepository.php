@@ -180,6 +180,77 @@ class UserRepository
         return $updated;
     }
 
+    public function updateAdminProfile(int $id, array $data): array
+    {
+        $user = $this->findById($id);
+        if (!$user) {
+            throw new InvalidArgumentException('Kullanıcı bulunamadı.');
+        }
+
+        $username = trim((string) ($data['username'] ?? $user['username'] ?? ''));
+        if ($username === '') {
+            throw new InvalidArgumentException('Kullanıcı adı boş olamaz.');
+        }
+        if (!preg_match('/^[a-zA-Z0-9_\-.]{3,}$/', $username)) {
+            throw new InvalidArgumentException('Kullanıcı adı en az 3 karakter olmalı ve sadece harf, sayı, nokta, tire veya alt çizgi içermelidir.');
+        }
+        $usernameOwner = $this->findByUsername($username);
+        if ($usernameOwner && (int) $usernameOwner['id'] !== $id) {
+            throw new InvalidArgumentException('Bu kullanıcı adı başka bir üyeye ait.');
+        }
+
+        $email = strtolower(trim((string) ($data['email'] ?? $user['email'] ?? '')));
+        if ($email === '') {
+            throw new InvalidArgumentException('E-posta adresi boş olamaz.');
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            throw new InvalidArgumentException('Geçerli bir e-posta adresi giriniz.');
+        }
+        $emailOwner = $this->findByEmail($email);
+        if ($emailOwner && (int) $emailOwner['id'] !== $id) {
+            throw new InvalidArgumentException('Bu e-posta adresi başka bir üyeye ait.');
+        }
+
+        $bio = trim((string) ($data['bio'] ?? ($user['bio'] ?? '')));
+        $avatar = trim((string) ($data['avatar_url'] ?? ($user['avatar_url'] ?? '')));
+        $website = trim((string) ($data['website_url'] ?? ($user['website_url'] ?? '')));
+        if (
+            $website !== ''
+            && !filter_var($website, FILTER_VALIDATE_URL)
+            && !(function_exists('str_starts_with') ? str_starts_with($website, '/') : strpos($website, '/') === 0)
+        ) {
+            throw new InvalidArgumentException('Geçerli bir web sitesi adresi giriniz.');
+        }
+
+        $kiBalanceRaw = $data['ki_balance'] ?? ($user['ki_balance'] ?? 0);
+        $kiBalance = is_numeric($kiBalanceRaw) ? (int) $kiBalanceRaw : (int) ($user['ki_balance'] ?? 0);
+        if ($kiBalance < 0) {
+            $kiBalance = 0;
+        }
+
+        $now = new DateTimeImmutable();
+        $stmt = $this->pdo->prepare('UPDATE users SET username = :username, email = :email, bio = :bio, avatar_url = :avatar, website_url = :website, ki_balance = :ki_balance, updated_at = :updated WHERE id = :id');
+        $stmt->execute([
+            ':username' => $username,
+            ':email' => $email,
+            ':bio' => $bio,
+            ':avatar' => $avatar,
+            ':website' => $website,
+            ':ki_balance' => $kiBalance,
+            ':updated' => $now->format('Y-m-d H:i:s'),
+            ':id' => $id,
+        ]);
+
+        $updated = $this->findById($id);
+        if (!$updated) {
+            throw new InvalidArgumentException('Kullanıcı güncellenemedi.');
+        }
+
+        unset($updated['password_hash']);
+
+        return $updated;
+    }
+
     public function updateRole(int $id, string $role): array
     {
         $this->assertValidRole($role);

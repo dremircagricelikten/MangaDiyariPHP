@@ -533,19 +533,86 @@ try {
                 'ftp_base_url' => 'ftp_base_url',
             ];
             $updates = [];
+            $clearPassword = isset($_POST['ftp_password_clear']) && (string) $_POST['ftp_password_clear'] === '1';
             foreach ($fields as $input => $key) {
-                if (!isset($_POST[$input])) {
+                if (!array_key_exists($input, $_POST)) {
                     continue;
                 }
                 $value = trim((string) $_POST[$input]);
                 if ($input === 'ftp_passive') {
                     $value = $value === '0' ? '0' : '1';
+                } elseif ($input === 'ftp_port') {
+                    $port = (int) $value;
+                    $value = (string) ($port > 0 ? $port : 21);
+                } elseif ($input === 'ftp_base_url') {
+                    $value = $value !== '' ? rtrim($value, '/') : '';
+                } elseif ($input === 'ftp_password') {
+                    if ($clearPassword) {
+                        $value = '';
+                    } elseif ($value === '') {
+                        continue;
+                    }
                 }
                 $settingRepo->set($key, $value);
                 $updates[$key] = $value;
             }
 
+            if ($clearPassword && !isset($updates['ftp_password'])) {
+                $settingRepo->set('ftp_password', '');
+                $updates['ftp_password'] = '';
+            }
+
             echo json_encode(['message' => 'Depolama ayarları güncellendi', 'data' => $updates]);
+            break;
+        case 'test-ftp-connection':
+            $host = trim((string) ($_POST['ftp_host'] ?? ''));
+            if ($host === '') {
+                throw new InvalidArgumentException('FTP sunucusu belirtilmelidir.');
+            }
+
+            $port = isset($_POST['ftp_port']) ? (int) $_POST['ftp_port'] : 21;
+            if ($port <= 0) {
+                $port = 21;
+            }
+
+            $username = (string) ($_POST['ftp_username'] ?? '');
+            $password = array_key_exists('ftp_password', $_POST) ? (string) $_POST['ftp_password'] : '';
+            $passive = !isset($_POST['ftp_passive']) || $_POST['ftp_passive'] !== '0';
+            $root = trim((string) ($_POST['ftp_root'] ?? ''));
+
+            $connection = @ftp_connect($host, $port, 10);
+            if (!$connection) {
+                throw new RuntimeException('FTP sunucusuna bağlanılamadı.');
+            }
+
+            if (!@ftp_login($connection, $username, $password)) {
+                ftp_close($connection);
+                throw new RuntimeException('FTP kimlik bilgileri kabul edilmedi.');
+            }
+
+            @ftp_pasv($connection, $passive);
+
+            $summary = [];
+            if ($root !== '') {
+                $currentDir = @ftp_pwd($connection) ?: '.';
+                if (!@ftp_chdir($connection, $root)) {
+                    ftp_close($connection);
+                    throw new RuntimeException('Belirtilen uzaktan klasöre erişilemiyor.');
+                }
+                $summary[] = 'Klasör erişimi doğrulandı';
+                @ftp_chdir($connection, $currentDir);
+            }
+
+            $summary[] = $passive ? 'Pasif mod açık' : 'Pasif mod kapalı';
+
+            ftp_close($connection);
+
+            echo json_encode([
+                'message' => 'FTP bağlantısı doğrulandı',
+                'data' => [
+                    'summary' => implode(' · ', $summary),
+                ],
+            ]);
             break;
         case 'update-smtp-settings':
             $enabled = isset($_POST['smtp_enabled']) && $_POST['smtp_enabled'] === '1' ? '1' : '0';
@@ -972,6 +1039,37 @@ try {
             $updated = $userRepo->updateCredentials($userId, $role, $isActive, $password);
             echo json_encode(['message' => 'Üye bilgileri güncellendi', 'user' => $updated]);
             break;
+        case 'get-user':
+            $userId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($userId <= 0) {
+                throw new InvalidArgumentException('Geçersiz üye');
+            }
+
+            $user = $userRepo->findById($userId);
+            if (!$user) {
+                throw new InvalidArgumentException('Kullanıcı bulunamadı.');
+            }
+            unset($user['password_hash']);
+            echo json_encode(['data' => $user]);
+            break;
+        case 'update-user-profile':
+            $userId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($userId <= 0) {
+                throw new InvalidArgumentException('Geçersiz üye');
+            }
+
+            $payload = [
+                'username' => $_POST['username'] ?? null,
+                'email' => $_POST['email'] ?? null,
+                'bio' => $_POST['bio'] ?? null,
+                'avatar_url' => $_POST['avatar_url'] ?? null,
+                'website_url' => $_POST['website_url'] ?? null,
+                'ki_balance' => $_POST['ki_balance'] ?? null,
+            ];
+
+            $updated = $userRepo->updateAdminProfile($userId, $payload);
+            echo json_encode(['message' => 'Üye profili güncellendi', 'user' => $updated]);
+            break;
         case 'get-ftp-settings':
             $ftpDefaults = [
                 'ftp_host' => '',
@@ -980,6 +1078,7 @@ try {
                 'ftp_password' => '',
                 'ftp_root' => '/',
                 'ftp_passive' => '1',
+                'ftp_base_url' => '',
             ];
             $settings = $settingRepo->all();
             $ftpSettings = [];

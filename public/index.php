@@ -119,73 +119,95 @@ $siteStats = [
 
     <header class="landing-hero py-5">
       <div class="container-xxl">
-        <div class="row g-5 align-items-center">
+        <div class="row g-5 align-items-stretch">
           <div class="col-xl-5">
-            <span class="eyebrow">Topluluk Mangaları</span>
-            <h1 class="display-5 fw-bold mb-3"><?= htmlspecialchars($site['tagline']) ?></h1>
-            <p class="lead text-secondary">Yeni seriler keşfedin, favorilerinizi takip edin ve toplulukla beraber anında yeni bölümlerden haberdar olun.</p>
-            <div class="hero-stats mt-4">
-              <div class="hero-stat">
-                <span class="hero-stat__label">Seri</span>
-                <span class="hero-stat__value"><?= number_format($siteStats['manga_total']) ?></span>
+            <div class="hero-intro glass-surface h-100">
+              <span class="hero-pill">Topluluk Mangaları</span>
+              <h1 class="display-5 fw-bold mb-3 hero-title"><?= htmlspecialchars($site['tagline']) ?></h1>
+              <p class="hero-lead">Yeni seriler keşfedin, favorilerinizi takip edin ve toplulukla beraber anında yeni bölümlerden haberdar olun.</p>
+              <div class="hero-actions d-flex flex-wrap gap-3 mt-4">
+                <a class="btn btn-primary btn-lg" href="#discover"><i class="bi bi-collection-play me-1"></i>Serileri Keşfet</a>
+                <a class="btn btn-outline-light btn-lg" href="#latest-feed"><i class="bi bi-lightning-charge me-1"></i>Son Güncellemeler</a>
+                <button class="btn btn-link text-decoration-none text-muted p-0 d-flex align-items-center gap-2" type="button" data-theme-toggle data-track="hero-theme-toggle">
+                  <i class="bi bi-moon-stars"></i>
+                  <span id="hero-theme-status">Koyu tema aktif</span>
+                </button>
               </div>
-              <div class="hero-stat">
-                <span class="hero-stat__label">Bölüm</span>
-                <span class="hero-stat__value"><?= number_format($siteStats['chapter_total']) ?></span>
+              <div class="hero-quick-links mt-4">
+                <a class="hero-quick-link" href="#latest-feed"><i class="bi bi-broadcast"></i> Canlı Güncellemeler</a>
+                <a class="hero-quick-link" href="#discover"><i class="bi bi-compass"></i> Keşfet Rafı</a>
+                <a class="hero-quick-link" href="#top-reads"><i class="bi bi-graph-up"></i> En Çok Okunanlar</a>
               </div>
-              <div class="hero-stat">
-                <span class="hero-stat__label">Premium</span>
-                <span class="hero-stat__value"><?= number_format($siteStats['premium_total']) ?></span>
+              <div class="hero-metrics mt-4">
+                <div class="hero-metric">
+                  <span class="hero-metric__icon"><i class="bi bi-bookshelf"></i></span>
+                  <span class="hero-metric__value"><?= number_format($siteStats['manga_total']) ?></span>
+                  <span class="hero-metric__label">Seri</span>
+                </div>
+                <div class="hero-metric">
+                  <span class="hero-metric__icon"><i class="bi bi-journal-richtext"></i></span>
+                  <span class="hero-metric__value"><?= number_format($siteStats['chapter_total']) ?></span>
+                  <span class="hero-metric__label">Bölüm</span>
+                </div>
+                <div class="hero-metric">
+                  <span class="hero-metric__icon"><i class="bi bi-star"></i></span>
+                  <span class="hero-metric__value"><?= number_format($siteStats['premium_total']) ?></span>
+                  <span class="hero-metric__label">Premium</span>
+                </div>
+                <div class="hero-metric">
+                  <span class="hero-metric__icon"><i class="bi bi-people"></i></span>
+                  <span class="hero-metric__value"><?= number_format($siteStats['active_members']) ?></span>
+                  <span class="hero-metric__label">Aktif Üye</span>
+                </div>
               </div>
-              <div class="hero-stat">
-                <span class="hero-stat__label">Aktif Üye</span>
-                <span class="hero-stat__value"><?= number_format($siteStats['active_members']) ?></span>
-              </div>
-            </div>
-            <div class="d-flex align-items-center gap-2 mt-3">
-              <button class="btn btn-outline-light btn-sm" type="button" data-theme-toggle data-track="hero-theme-toggle">
-                <i class="bi bi-moon-stars"></i>
-                <span class="ms-1 d-none d-md-inline">Temayı Değiştir</span>
-              </button>
-              <span class="text-muted small" id="hero-theme-status">Koyu tema aktif</span>
             </div>
           </div>
           <div class="col-xl-7">
             <?php $heroWidgets = $widgetsByArea['hero'] ?? []; ?>
-            <?php if (!empty($heroWidgets)): ?>
-              <?php foreach ($heroWidgets as $widget): ?>
-                <?php if ($widget['type'] === 'popular_slider'): ?>
-                  <div class="hero-showcase">
-                    <div id="featured-highlight" class="feature-highlight"></div>
-                    <div class="feature-controls">
-                      <div>
-                        <label for="popular-sort" class="form-label small text-uppercase">Sıralama</label>
-                        <select id="popular-sort" class="form-select">
-                          <option value="random">Rastgele</option>
-                          <option value="newest">En Yeni</option>
-                          <option value="updated">Son Güncellenen</option>
-                          <option value="alphabetical">Alfabetik</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label for="popular-status" class="form-label small text-uppercase">Durum</label>
-                        <select id="popular-status" class="form-select">
-                          <option value="">Tümü</option>
-                          <option value="ongoing">Devam Ediyor</option>
-                          <option value="completed">Tamamlandı</option>
-                          <option value="hiatus">Ara Verildi</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div id="featured-rail" class="featured-rail mt-3"></div>
+            <div class="hero-showcase glass-surface h-100">
+              <div class="hero-showcase__header d-flex flex-wrap justify-content-between align-items-center gap-3">
+                <div>
+                  <span class="eyebrow text-uppercase">Öne Çıkanlar</span>
+                  <h2 class="h4 mb-0">Trend rafını keşfet</h2>
+                </div>
+                <div class="hero-filters d-flex flex-wrap gap-3">
+                  <div class="hero-filter">
+                    <label for="popular-sort" class="form-label small text-uppercase">Sıralama</label>
+                    <select id="popular-sort" class="form-select form-select-sm">
+                      <option value="random">Rastgele</option>
+                      <option value="newest">En Yeni</option>
+                      <option value="updated">Son Güncellenen</option>
+                      <option value="alphabetical">Alfabetik</option>
+                    </select>
                   </div>
+                  <div class="hero-filter">
+                    <label for="popular-status" class="form-label small text-uppercase">Durum</label>
+                    <select id="popular-status" class="form-select form-select-sm">
+                      <option value="">Tümü</option>
+                      <option value="ongoing">Devam Ediyor</option>
+                      <option value="completed">Tamamlandı</option>
+                      <option value="hiatus">Ara Verildi</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <div class="hero-showcase__body">
+                <?php if (!empty($heroWidgets)): ?>
+                  <?php foreach ($heroWidgets as $widget): ?>
+                    <?php if ($widget['type'] === 'popular_slider'): ?>
+                      <div class="hero-feature-stack">
+                        <div id="featured-highlight" class="feature-highlight"></div>
+                        <div id="featured-rail" class="featured-rail mt-4"></div>
+                      </div>
+                    <?php else: ?>
+                      <div class="feature-placeholder">Yeni hero widget türü yakında desteklenecek.</div>
+                    <?php endif; ?>
+                  <?php endforeach; ?>
                 <?php else: ?>
-                  <div class="feature-placeholder">Yeni hero widget türü yakında desteklenecek.</div>
+                  <div class="feature-placeholder">Ana vitrin bileşeni henüz etkin değil.</div>
                 <?php endif; ?>
-              <?php endforeach; ?>
-            <?php else: ?>
-              <div class="feature-placeholder">Ana vitrin bileşeni henüz etkin değil.</div>
-            <?php endif; ?>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -193,20 +215,20 @@ $siteStats = [
 
     <main class="landing-main py-5">
       <div class="container-xxl">
-        <div class="layout-grid">
+        <div class="layout-grid layout-grid--modern">
           <div class="layout-main">
             <?php $mainWidgets = $widgetsByArea['main'] ?? []; ?>
             <?php foreach ($mainWidgets as $widget): ?>
               <?php if ($widget['type'] === 'latest_updates'): ?>
-                <section class="landing-section" data-widget="latest">
+                <section class="landing-section landing-section--accent" data-widget="latest" id="latest-feed">
                   <div class="section-header">
                     <div>
                       <span class="eyebrow">Anlık Güncellemeler</span>
                       <h2><?= htmlspecialchars($widget['title']) ?></h2>
                       <p class="text-secondary">Yeni yüklenen bölümleri yakalayın.</p>
                     </div>
-                    <div class="widget-controls d-flex gap-3 flex-wrap">
-                      <div>
+                    <div class="widget-controls widget-controls--pill d-flex gap-3 flex-wrap">
+                      <div class="widget-control">
                         <label for="latest-sort" class="form-label small text-uppercase">Sıralama</label>
                         <select id="latest-sort" class="form-select form-select-sm">
                           <option value="newest">En Yeni</option>
@@ -215,7 +237,7 @@ $siteStats = [
                           <option value="chapter_asc">Bölüm No (Artan)</option>
                         </select>
                       </div>
-                      <div>
+                      <div class="widget-control">
                         <label for="latest-status" class="form-label small text-uppercase">Durum</label>
                         <select id="latest-status" class="form-select form-select-sm">
                           <option value="">Tümü</option>
@@ -229,7 +251,7 @@ $siteStats = [
                   <div class="row g-4" id="latest-list"></div>
                 </section>
               <?php elseif ($widget['type'] === 'popular_slider'): ?>
-                <section class="landing-section" data-widget="popular-grid">
+                <section class="landing-section landing-section--frosted" data-widget="popular-grid">
                   <div class="section-header">
                     <div>
                       <span class="eyebrow">Trend</span>
@@ -249,7 +271,7 @@ $siteStats = [
               <?php endif; ?>
             <?php endforeach; ?>
 
-            <section id="discover" class="landing-section">
+            <section id="discover" class="landing-section landing-section--surface">
               <div class="section-header">
                 <div>
                   <span class="eyebrow">Keşfet</span>
@@ -267,7 +289,7 @@ $siteStats = [
               </div>
             <?php endif; ?>
 
-            <div class="sidebar-widget top-reads-widget" data-widget="top-reads">
+            <div class="sidebar-widget top-reads-widget" data-widget="top-reads" id="top-reads">
               <div class="sidebar-widget__header">
                 <div>
                   <h3>En Çok Okunanlar</h3>

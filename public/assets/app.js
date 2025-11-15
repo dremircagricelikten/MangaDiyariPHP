@@ -51,19 +51,30 @@ $(function () {
     const cover = manga.cover_image || 'https://placehold.co/400x600?text=Manga';
     const url = `manga.php?slug=${encodeURIComponent(manga.slug)}`;
     const author = manga.author || 'Bilinmiyor';
+    const genres = (manga.genres || '')
+      .split(',')
+      .map((genre) => genre.trim())
+      .filter((genre) => genre.length)
+      .slice(0, 3)
+      .join(', ');
     return `
       <div class="col-sm-6 col-lg-4 col-xxl-3">
         <article class="manga-card">
-          <a href="${url}" class="manga-card__media" style="background-image:url('${cover}')">
-            <span class="manga-card__status">${formatStatus(manga.status)}</span>
-          </a>
-          <div class="manga-card__body">
-            <h3 class="manga-card__title"><a href="${url}">${manga.title}</a></h3>
-            <p class="manga-card__description text-truncate-3">${manga.description || 'Açıklama bulunmuyor.'}</p>
-            <div class="manga-card__meta">
-              <span><i class="bi bi-person"></i> ${author}</span>
+          <div class="manga-card__media" style="background-image:url('${cover}')">
+            <span class="manga-card__badge">${formatStatus(manga.status)}</span>
+            <div class="manga-card__overlay">
+              <h3 class="manga-card__title"><a href="${url}">${escapeHtml(manga.title)}</a></h3>
+              <div class="manga-card__overlay-meta">
+                <span><i class="bi bi-person"></i> ${escapeHtml(author)}</span>
+              </div>
             </div>
-            <a href="${url}" class="btn btn-sm btn-primary w-100">Seri Detayı</a>
+          </div>
+          <div class="manga-card__body">
+            <p class="manga-card__description text-truncate-3">${escapeHtml(manga.description || 'Açıklama bulunmuyor.')}</p>
+            <div class="manga-card__footer">
+              <span class="manga-card__genres">${escapeHtml(genres || 'Tür belirtilmedi')}</span>
+              <a href="${url}" class="btn btn-outline-light btn-sm">Seri Detayı</a>
+            </div>
           </div>
         </article>
       </div>`;
@@ -85,24 +96,27 @@ $(function () {
     const featured = data[0];
     const cover = featured.cover_image || 'https://placehold.co/600x900?text=Manga';
     const url = `manga.php?slug=${encodeURIComponent(featured.slug)}`;
-    const artist = featured.artist || featured.author || 'Bilinmiyor';
+    const title = escapeHtml(featured.title || 'Seri');
+    const authorName = escapeHtml(featured.author || 'Bilinmiyor');
+    const artist = escapeHtml(featured.artist || featured.author || 'Bilinmiyor');
+    const genres = escapeHtml(featured.genres || 'Belirtilmedi');
+    const description = escapeHtml(
+      truncate(featured.description || 'Topluluğun sevdiği popüler serilerden biri.', 220)
+    );
 
     container.html(`
       <article class="hero-feature">
-        <a class="hero-feature__media" href="${url}" aria-label="${featured.title}">
-          <img src="${cover}" alt="${featured.title}" loading="lazy">
+        <a class="hero-feature__media" href="${url}" aria-label="${title}">
+          <img src="${cover}" alt="${title}" loading="lazy">
         </a>
         <div class="hero-feature__content">
           <span class="hero-feature__badge">${formatStatus(featured.status)}</span>
-          <h3 class="hero-feature__title"><a href="${url}">${featured.title}</a></h3>
-          <p class="hero-feature__description">${truncate(
-            featured.description || 'Topluluğun sevdiği popüler serilerden biri.',
-            220
-          )}</p>
+          <h3 class="hero-feature__title"><a href="${url}">${title}</a></h3>
+          <p class="hero-feature__description">${description}</p>
           <dl class="hero-feature__meta">
             <div>
               <dt>Yazar</dt>
-              <dd>${featured.author || 'Bilinmiyor'}</dd>
+              <dd>${authorName}</dd>
             </div>
             <div>
               <dt>Çizer</dt>
@@ -110,7 +124,7 @@ $(function () {
             </div>
             <div>
               <dt>Tür</dt>
-              <dd>${featured.genres || 'Belirtilmedi'}</dd>
+              <dd>${genres}</dd>
             </div>
           </dl>
           <a class="btn btn-primary btn-sm hero-feature__cta" href="${url}">
@@ -128,8 +142,10 @@ $(function () {
       <a class="featured-item" href="${url}">
         <span class="featured-item__media" style="background-image:url('${cover}')"></span>
         <span class="featured-item__content">
-          <span class="featured-item__title">${manga.title}</span>
-          <span class="featured-item__meta">${formatStatus(manga.status)} · ${manga.author || 'Bilinmiyor'}</span>
+          <span class="featured-item__title">${escapeHtml(manga.title)}</span>
+          <span class="featured-item__meta">${formatStatus(manga.status)} · ${escapeHtml(
+            manga.author || 'Bilinmiyor'
+          )}</span>
         </span>
       </a>`;
   }
@@ -188,7 +204,7 @@ $(function () {
         <a class="sidebar-item" href="${url}">
           <span class="sidebar-item__media" style="background-image:url('${cover}')"></span>
           <span class="sidebar-item__content">
-            <span class="sidebar-item__title">${manga.title}</span>
+            <span class="sidebar-item__title">${escapeHtml(manga.title)}</span>
             <span class="sidebar-item__meta">${formatStatus(manga.status)}</span>
           </span>
         </a>`);
@@ -210,14 +226,15 @@ $(function () {
     const cover = chapter.cover_image || 'https://placehold.co/400x600?text=Manga';
     const mangaUrl = `manga.php?slug=${encodeURIComponent(chapter.manga_slug)}`;
     const chapterUrl = `chapter.php?slug=${encodeURIComponent(chapter.manga_slug)}&chapter=${encodeURIComponent(chapter.number)}`;
-    const chapterTitle = chapter.title || `Bölüm ${chapter.number}`;
+    const chapterTitle = chapter.title ? escapeHtml(chapter.title) : `Bölüm ${escapeHtml(chapter.number)}`;
+    const seriesTitle = escapeHtml(chapter.manga_title || 'Seri');
     return `
       <div class="col-xl-4 col-lg-6">
         <article class="update-card">
           <div class="update-card__media" style="background-image:url('${cover}')"></div>
           <div class="update-card__body">
-            <div class="update-card__series">${chapter.manga_title}</div>
-            <div class="update-card__chapter">Bölüm ${chapter.number}</div>
+            <div class="update-card__series">${seriesTitle}</div>
+            <div class="update-card__chapter">Bölüm ${escapeHtml(chapter.number)}</div>
             <p class="update-card__title text-truncate-3">${chapterTitle}</p>
             <div class="update-card__meta">
               <span><i class="bi bi-calendar-event"></i> ${formatDate(chapter.created_at)}</span>
@@ -262,11 +279,12 @@ $(function () {
 
     chapters.slice(0, 8).forEach((chapter) => {
       const url = `chapter.php?slug=${encodeURIComponent(chapter.manga_slug)}&chapter=${encodeURIComponent(chapter.number)}`;
+      const seriesTitle = escapeHtml(chapter.manga_title || 'Seri');
       container.append(`
         <a class="sidebar-item" href="${url}">
           <span class="sidebar-item__content">
-            <span class="sidebar-item__title">${chapter.manga_title}</span>
-            <span class="sidebar-item__meta">Bölüm ${chapter.number}</span>
+            <span class="sidebar-item__title">${seriesTitle}</span>
+            <span class="sidebar-item__meta">Bölüm ${escapeHtml(chapter.number)}</span>
           </span>
           ${chapter.ki_cost > 0 ? '<span class="badge bg-warning text-dark">Premium</span>' : ''}
         </a>`);
