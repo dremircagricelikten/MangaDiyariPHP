@@ -90,6 +90,71 @@ $headerActions = [
             </div>
           </section>
 
+          <section class="admin-section" id="role-manager">
+            <div class="admin-section-header">
+              <div>
+                <span class="eyebrow">Rol Yapısı</span>
+                <h2>Rol Yöneticisi</h2>
+                <p class="text-muted mb-0">WordPress'teki gibi yeni roller oluşturun, yetkileri düzenleyin.</p>
+              </div>
+            </div>
+            <div class="row g-4">
+              <div class="col-lg-4">
+                <div class="card glass-card h-100">
+                  <div class="card-body">
+                    <form id="role-form" class="vstack gap-3">
+                      <input type="hidden" id="role-current-key" value="">
+                      <div>
+                        <label class="form-label">Rol Anahtarı</label>
+                        <input type="text" class="form-control" id="role-key" placeholder="moderator" required>
+                        <div class="form-text">Küçük harf, sayı, tire veya alt çizgi kullanın.</div>
+                      </div>
+                      <div>
+                        <label class="form-label">Gösterilen Ad</label>
+                        <input type="text" class="form-control" id="role-label" placeholder="Moderasyon Ekibi" required>
+                      </div>
+                      <div>
+                        <label class="form-label">Yetkiler</label>
+                        <input type="text" class="form-control" id="role-capabilities" placeholder="manage_content, manage_comments">
+                        <div class="form-text">Virgülle ayırın. Örn: manage_content, manage_comments</div>
+                      </div>
+                      <div>
+                        <label class="form-label">Sıra</label>
+                        <input type="number" class="form-control" id="role-order" value="0">
+                      </div>
+                      <div class="d-flex gap-2 align-items-center">
+                        <button class="btn btn-primary btn-sm" type="submit"><i class="bi bi-save me-1"></i>Rolü Kaydet</button>
+                        <button class="btn btn-link btn-sm text-decoration-none text-muted" type="button" id="role-reset">Sıfırla</button>
+                      </div>
+                      <div id="role-form-message" class="small"></div>
+                    </form>
+                  </div>
+                </div>
+              </div>
+              <div class="col-lg-8">
+                <div class="card glass-card h-100">
+                  <div class="card-body">
+                    <h3 class="h5 mb-3">Kayıtlı Roller</h3>
+                    <div class="table-responsive">
+                      <table class="table table-dark table-hover align-middle" id="role-table">
+                        <thead>
+                          <tr>
+                            <th>Rol</th>
+                            <th>Anahtar</th>
+                            <th>Yetkiler</th>
+                            <th class="text-end">İşlemler</th>
+                          </tr>
+                        </thead>
+                        <tbody></tbody>
+                      </table>
+                    </div>
+                    <div id="role-table-empty" class="empty-state d-none">Henüz özel rol tanımlanmadı.</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section class="admin-section">
             <div class="admin-section-header">
               <div>

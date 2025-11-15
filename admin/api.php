@@ -20,6 +20,10 @@ require_once __DIR__ . '/../src/KiRepository.php';
 require_once __DIR__ . '/../src/PageRepository.php';
 require_once __DIR__ . '/../src/InteractionRepository.php';
 require_once __DIR__ . '/../src/Mailer.php';
+require_once __DIR__ . '/../src/PostRepository.php';
+require_once __DIR__ . '/../src/TaxonomyRepository.php';
+require_once __DIR__ . '/../src/MediaRepository.php';
+require_once __DIR__ . '/../src/RoleRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
@@ -34,6 +38,10 @@ use MangaDiyari\Core\PageRepository;
 use MangaDiyari\Core\InteractionRepository;
 use MangaDiyari\Core\Slugger;
 use MangaDiyari\Core\Mailer;
+use MangaDiyari\Core\PostRepository;
+use MangaDiyari\Core\TaxonomyRepository;
+use MangaDiyari\Core\MediaRepository;
+use MangaDiyari\Core\RoleRepository;
 
 Auth::start();
 if (!Auth::checkRole(['admin', 'editor'])) {
@@ -53,6 +61,11 @@ try {
     $kiRepo = new KiRepository($pdo);
     $pageRepo = new PageRepository($pdo);
     $interactionRepo = new InteractionRepository($pdo);
+    $postRepo = new PostRepository($pdo);
+    $taxonomyRepo = new TaxonomyRepository($pdo);
+    $mediaRepo = new MediaRepository($pdo);
+    $roleRepo = new RoleRepository($pdo);
+    $userRepo->setRoleRepository($roleRepo);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
@@ -690,13 +703,248 @@ try {
             $pageRepo->delete($pageId);
             echo json_encode(['message' => 'Sayfa silindi']);
             break;
+        case 'list-posts':
+            $status = isset($_GET['status']) ? trim((string) $_GET['status']) : '';
+            if ($status === 'all') {
+                $status = '';
+            }
+            $search = trim((string) ($_GET['search'] ?? ''));
+            $posts = $postRepo->list([
+                'status' => $status !== '' ? $status : null,
+                'search' => $search !== '' ? $search : null,
+            ]);
+            echo json_encode(['data' => $posts]);
+            break;
+        case 'get-post':
+            $postId = isset($_GET['id']) ? (int) $_GET['id'] : 0;
+            if ($postId <= 0) {
+                throw new InvalidArgumentException('Geçersiz yazı');
+            }
+            $post = $postRepo->find($postId);
+            if (!$post) {
+                throw new InvalidArgumentException('Yazı bulunamadı');
+            }
+            echo json_encode(['data' => $post]);
+            break;
+        case 'create-post':
+            $title = trim((string) ($_POST['title'] ?? ''));
+            if ($title === '') {
+                throw new InvalidArgumentException('Yazı başlığı zorunludur.');
+            }
+            $post = $postRepo->create([
+                'title' => $title,
+                'slug' => $_POST['slug'] ?? '',
+                'excerpt' => $_POST['excerpt'] ?? '',
+                'content' => $_POST['content'] ?? '',
+                'status' => $_POST['status'] ?? 'draft',
+                'featured_image' => $_POST['featured_image'] ?? '',
+                'author_id' => isset($_POST['author_id']) ? (int) $_POST['author_id'] : null,
+                'categories' => parseTermInput($_POST['categories'] ?? []),
+                'tags' => parseTermInput($_POST['tags'] ?? []),
+            ]);
+            echo json_encode(['message' => 'Yazı oluşturuldu', 'data' => $post]);
+            break;
+        case 'update-post':
+            $postId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($postId <= 0) {
+                throw new InvalidArgumentException('Geçersiz yazı');
+            }
+
+            $payload = [];
+            foreach (['title', 'slug', 'excerpt', 'content', 'status', 'featured_image'] as $field) {
+                if (array_key_exists($field, $_POST)) {
+                    $payload[$field] = $_POST[$field];
+                }
+            }
+            if (array_key_exists('author_id', $_POST)) {
+                $payload['author_id'] = $_POST['author_id'] !== '' ? (int) $_POST['author_id'] : null;
+            }
+            if (array_key_exists('categories', $_POST)) {
+                $payload['categories'] = parseTermInput($_POST['categories']);
+            }
+            if (array_key_exists('tags', $_POST)) {
+                $payload['tags'] = parseTermInput($_POST['tags']);
+            }
+
+            $updated = $postRepo->update($postId, $payload);
+            if (!$updated) {
+                throw new InvalidArgumentException('Yazı güncellenemedi');
+            }
+            echo json_encode(['message' => 'Yazı güncellendi', 'data' => $updated]);
+            break;
+        case 'delete-post':
+            $postId = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($postId <= 0) {
+                throw new InvalidArgumentException('Geçersiz yazı');
+            }
+            $postRepo->delete($postId);
+            echo json_encode(['message' => 'Yazı silindi']);
+            break;
+        case 'list-taxonomies':
+            $taxonomy = isset($_GET['taxonomy']) ? strtolower(trim((string) $_GET['taxonomy'])) : '';
+            if (!in_array($taxonomy, ['category', 'tag'], true)) {
+                throw new InvalidArgumentException('Geçersiz taksonomi');
+            }
+            $terms = $taxonomyRepo->list($taxonomy);
+            echo json_encode(['data' => $terms]);
+            break;
+        case 'save-taxonomy':
+            $taxonomy = isset($_POST['taxonomy']) ? strtolower(trim((string) $_POST['taxonomy'])) : '';
+            if (!in_array($taxonomy, ['category', 'tag'], true)) {
+                throw new InvalidArgumentException('Geçersiz taksonomi');
+            }
+            $payload = [
+                'name' => $_POST['name'] ?? '',
+                'slug' => $_POST['slug'] ?? '',
+                'description' => $_POST['description'] ?? '',
+            ];
+            $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            $term = $id > 0
+                ? $taxonomyRepo->update($taxonomy, $id, $payload)
+                : $taxonomyRepo->create($taxonomy, $payload);
+            if (!$term) {
+                throw new InvalidArgumentException('Taksonomi kaydedilemedi');
+            }
+            echo json_encode(['message' => 'Terim kaydedildi', 'data' => $term]);
+            break;
+        case 'delete-taxonomy':
+            $taxonomy = isset($_POST['taxonomy']) ? strtolower(trim((string) $_POST['taxonomy'])) : '';
+            if (!in_array($taxonomy, ['category', 'tag'], true)) {
+                throw new InvalidArgumentException('Geçersiz taksonomi');
+            }
+            $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($id <= 0) {
+                throw new InvalidArgumentException('Geçersiz terim');
+            }
+            $taxonomyRepo->delete($taxonomy, $id);
+            echo json_encode(['message' => 'Terim silindi']);
+            break;
+        case 'list-media':
+            $search = trim((string) ($_GET['search'] ?? ''));
+            $media = $mediaRepo->list([
+                'search' => $search !== '' ? $search : null,
+            ]);
+            $media = array_map(static function (array $item): array {
+                $item['full_url'] = '../public/' . ltrim($item['url'], '/');
+                return $item;
+            }, $media);
+            echo json_encode(['data' => $media]);
+            break;
+        case 'upload-media':
+            if (empty($_FILES['media_file']) || !is_uploaded_file($_FILES['media_file']['tmp_name'])) {
+                throw new InvalidArgumentException('Medya dosyası seçilmedi.');
+            }
+            $saved = persistMediaUpload($_FILES['media_file']);
+            $record = $mediaRepo->create([
+                'filename' => $saved['filename'],
+                'path' => $saved['path'],
+                'mime_type' => $saved['mime_type'],
+                'size_bytes' => $saved['size_bytes'],
+                'title' => $_POST['title'] ?? $saved['filename'],
+                'alt_text' => $_POST['alt_text'] ?? '',
+                'created_by' => Auth::user()['id'] ?? null,
+            ]);
+            $record['full_url'] = '../public/' . ltrim($record['url'], '/');
+            echo json_encode(['message' => 'Medya yüklendi', 'data' => $record]);
+            break;
+        case 'delete-media':
+            $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($id <= 0) {
+                throw new InvalidArgumentException('Geçersiz medya');
+            }
+            $media = $mediaRepo->find($id);
+            if ($media) {
+                $filePath = __DIR__ . '/../public/' . ltrim($media['url'], '/');
+                if (is_file($filePath)) {
+                    @unlink($filePath);
+                }
+            }
+            $mediaRepo->delete($id);
+            echo json_encode(['message' => 'Medya silindi']);
+            break;
+        case 'list-roles':
+            echo json_encode(['data' => $roleRepo->list()]);
+            break;
+        case 'create-role':
+            $capabilities = parseTermInput($_POST['capabilities'] ?? []);
+            $role = $roleRepo->create([
+                'role_key' => $_POST['role_key'] ?? '',
+                'label' => $_POST['label'] ?? '',
+                'capabilities' => $capabilities,
+                'sort_order' => isset($_POST['sort_order']) ? (int) $_POST['sort_order'] : 0,
+            ]);
+            echo json_encode(['message' => 'Rol oluşturuldu', 'data' => $role]);
+            break;
+        case 'update-role':
+            $key = $_POST['role_key'] ?? '';
+            if ($key === '') {
+                throw new InvalidArgumentException('Geçersiz rol');
+            }
+            $payload = [
+                'role_key' => $_POST['new_role_key'] ?? $key,
+                'label' => $_POST['label'] ?? null,
+                'sort_order' => isset($_POST['sort_order']) ? (int) $_POST['sort_order'] : null,
+            ];
+            if (array_key_exists('capabilities', $_POST)) {
+                $payload['capabilities'] = parseTermInput($_POST['capabilities']);
+            }
+            $role = $roleRepo->update($key, array_filter($payload, static fn($value) => $value !== null));
+            if (!$role) {
+                throw new InvalidArgumentException('Rol güncellenemedi');
+            }
+            echo json_encode(['message' => 'Rol güncellendi', 'data' => $role]);
+            break;
+        case 'delete-role':
+            $key = $_POST['role_key'] ?? '';
+            if ($key === '') {
+                throw new InvalidArgumentException('Geçersiz rol');
+            }
+            $roleRepo->delete($key);
+            echo json_encode(['message' => 'Rol silindi']);
+            break;
+        case 'list-comments-admin':
+            $status = isset($_GET['status']) ? (string) $_GET['status'] : 'active';
+            $search = isset($_GET['search']) ? (string) $_GET['search'] : '';
+            $comments = $interactionRepo->listForAdmin([
+                'status' => $status,
+                'search' => $search,
+            ]);
+            echo json_encode(['data' => $comments]);
+            break;
+        case 'trash-comment':
+            $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($id <= 0) {
+                throw new InvalidArgumentException('Geçersiz yorum');
+            }
+            $interactionRepo->setDeleted($id, true);
+            echo json_encode(['message' => 'Yorum çöp kutusuna taşındı']);
+            break;
+        case 'restore-comment':
+            $id = isset($_POST['id']) ? (int) $_POST['id'] : 0;
+            if ($id <= 0) {
+                throw new InvalidArgumentException('Geçersiz yorum');
+            }
+            $interactionRepo->setDeleted($id, false);
+            echo json_encode(['message' => 'Yorum geri yüklendi']);
+            break;
+        case 'purge-comments':
+            $removed = $interactionRepo->purgeDeleted();
+            echo json_encode(['message' => 'Çöp kutusu temizlendi', 'removed' => $removed]);
+            break;
         case 'recent-comments':
             $comments = $interactionRepo->listRecentComments(10);
             echo json_encode(['data' => $comments]);
             break;
         case 'list-users':
-            $users = array_map(static function (array $user): array {
+            $roles = [];
+            foreach ($roleRepo->list() as $role) {
+                $roles[$role['role_key']] = $role;
+            }
+            $users = array_map(static function (array $user) use ($roles): array {
                 unset($user['password_hash']);
+                $roleKey = $user['role'] ?? 'member';
+                $user['role_label'] = $roles[$roleKey]['label'] ?? ucfirst($roleKey);
+                $user['role_capabilities'] = $roles[$roleKey]['capabilities'] ?? [];
                 return $user;
             }, $userRepo->all());
             echo json_encode(['data' => $users]);
@@ -1305,4 +1553,82 @@ function persistCoverUpload(array $file): ?string
     }
 
     return 'uploads/covers/' . $filename;
+}
+
+/**
+ * @param mixed $value
+ * @return array<int, string>
+ */
+function parseTermInput(mixed $value): array
+{
+    if (is_array($value)) {
+        $items = $value;
+    } else {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return [];
+        }
+        if (str_starts_with($value, '[')) {
+            try {
+                $decoded = json_decode($value, true, flags: JSON_THROW_ON_ERROR);
+                $items = is_array($decoded) ? $decoded : [];
+            } catch (Throwable) {
+                $items = [];
+            }
+        } else {
+            $items = array_map('trim', explode(',', $value));
+        }
+    }
+
+    $normalized = [];
+    foreach ($items as $item) {
+        $term = strtolower(trim((string) $item));
+        if ($term !== '') {
+            $normalized[] = $term;
+        }
+    }
+
+    return array_values(array_unique($normalized));
+}
+
+/**
+ * @return array{filename:string,path:string,mime_type:string,size_bytes:int}
+ */
+function persistMediaUpload(array $file): array
+{
+    if (($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        throw new InvalidArgumentException('Dosya yüklenirken hata oluştu.');
+    }
+
+    $extension = strtolower((string) pathinfo((string) $file['name'], PATHINFO_EXTENSION));
+    $allowed = ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'pdf', 'mp4', 'zip'];
+    if (!in_array($extension, $allowed, true)) {
+        throw new InvalidArgumentException('Desteklenmeyen dosya uzantısı.');
+    }
+
+    $mediaRoot = __DIR__ . '/../public/uploads/media/' . date('Y') . '/' . date('m');
+    if (!is_dir($mediaRoot)) {
+        mkdir($mediaRoot, 0775, true);
+    }
+
+    $baseName = Slugger::slugify((string) pathinfo((string) $file['name'], PATHINFO_FILENAME));
+    if ($baseName === '') {
+        $baseName = 'dosya';
+    }
+    $filename = $baseName . '-' . substr(bin2hex(random_bytes(4)), 0, 8) . '.' . $extension;
+    $target = $mediaRoot . '/' . $filename;
+
+    if (!move_uploaded_file($file['tmp_name'], $target)) {
+        throw new InvalidArgumentException('Dosya kaydedilemedi.');
+    }
+
+    $mimeType = mime_content_type($target) ?: ($file['type'] ?? 'application/octet-stream');
+    $relativePath = 'uploads/media/' . date('Y') . '/' . date('m') . '/' . $filename;
+
+    return [
+        'filename' => $filename,
+        'path' => $relativePath,
+        'mime_type' => $mimeType,
+        'size_bytes' => (int) filesize($target),
+    ];
 }

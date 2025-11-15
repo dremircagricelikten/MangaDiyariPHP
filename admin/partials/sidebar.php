@@ -25,9 +25,21 @@
   </div>
   <nav class="sidebar-nav">
     <ul class="menu-block">
-      <li class="menu-heading">Genel</li>
+      <li class="menu-heading">Başlangıç</li>
       <li><a class="menu-link <?= admin_nav_active('index') ?>" href="index.php"><i class="bi bi-speedometer2"></i><span>Gösterge Paneli</span></a></li>
+    </ul>
+    <ul class="menu-block">
+      <li class="menu-heading">İçerik</li>
+      <li><a class="menu-link <?= admin_nav_active('posts') ?>" href="posts.php"><i class="bi bi-journal-text"></i><span>Yazılar</span></a></li>
+      <li><a class="menu-link" href="posts.php#new-post"><i class="bi bi-plus-circle"></i><span>Yeni Yazı</span></a></li>
+      <li><a class="menu-link <?= admin_nav_active('media') ?>" href="media.php"><i class="bi bi-images"></i><span>Medya</span></a></li>
+      <li><a class="menu-link <?= admin_nav_active('pages') ?>" href="pages.php"><i class="bi bi-file-earmark-text"></i><span>Sayfalar</span></a></li>
+      <li><a class="menu-link <?= admin_nav_active('comments') ?>" href="comments.php"><i class="bi bi-chat-dots"></i><span>Yorumlar</span></a></li>
+    </ul>
+    <ul class="menu-block">
+      <li class="menu-heading">Manga</li>
       <li><a class="menu-link <?= admin_nav_active('manga') ?>" href="manga.php"><i class="bi bi-book-half"></i><span>Manga Yönetimi</span></a></li>
+      <li><a class="menu-link <?= admin_nav_active('chapters') ?>" href="chapters.php"><i class="bi bi-collection-play"></i><span>Bölüm Yüklemeleri</span></a></li>
       <li><a class="menu-link <?= admin_nav_active('market') ?>" href="market.php"><i class="bi bi-shop"></i><span>Market Yönetimi</span></a></li>
     </ul>
     <ul class="menu-block">
@@ -35,11 +47,19 @@
       <li><a class="menu-link <?= admin_nav_active('appearance') ?>" href="appearance.php"><i class="bi bi-palette"></i><span>Tema Ayarları</span></a></li>
       <li><a class="menu-link <?= admin_nav_active('widgets') ?>" href="widgets.php"><i class="bi bi-stars"></i><span>Ana Sayfa Widgetları</span></a></li>
       <li><a class="menu-link <?= admin_nav_active('menus') ?>" href="menus.php"><i class="bi bi-menu-button"></i><span>Menü Yönetimi</span></a></li>
-      <li><a class="menu-link <?= admin_nav_active('pages') ?>" href="pages.php"><i class="bi bi-file-earmark-text"></i><span>Sayfalar</span></a></li>
     </ul>
     <ul class="menu-block">
-      <li class="menu-heading">Topluluk</li>
-      <li><a class="menu-link <?= admin_nav_active('community') ?>" href="community.php"><i class="bi bi-people"></i><span>Üyeler &amp; Reklam</span></a></li>
+      <li class="menu-heading">Eklentiler</li>
+      <li><a class="menu-link <?= admin_nav_active('plugins') ?>" href="plugins.php"><i class="bi bi-box-seam"></i><span>Eklentiler</span></a></li>
+    </ul>
+    <ul class="menu-block">
+      <li class="menu-heading">Kullanıcılar</li>
+      <li><a class="menu-link <?= admin_nav_active('community') ?>" href="community.php"><i class="bi bi-people"></i><span>Tüm Kullanıcılar</span></a></li>
+      <li><a class="menu-link" href="community.php#role-manager"><i class="bi bi-shield-lock"></i><span>Roller</span></a></li>
+    </ul>
+    <ul class="menu-block">
+      <li class="menu-heading">Araçlar</li>
+      <li><a class="menu-link <?= admin_nav_active('tools') ?>" href="tools.php"><i class="bi bi-wrench"></i><span>Araçlar</span></a></li>
       <li><a class="menu-link <?= admin_nav_active('integrations') ?>" href="integrations.php"><i class="bi bi-plug"></i><span>Entegrasyonlar</span></a></li>
     </ul>
     <ul class="menu-block">

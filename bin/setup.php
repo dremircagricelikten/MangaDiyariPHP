@@ -89,6 +89,56 @@ $pdo->exec('CREATE TABLE IF NOT EXISTS widgets (
     config TEXT NOT NULL DEFAULT "{}"
 )');
 
+$pdo->exec('CREATE TABLE IF NOT EXISTS posts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    slug TEXT NOT NULL UNIQUE,
+    excerpt TEXT,
+    content TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT "draft",
+    featured_image TEXT,
+    author_id INTEGER,
+    category_slugs TEXT,
+    tag_slugs TEXT,
+    published_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)');
+
+$pdo->exec('CREATE TABLE IF NOT EXISTS taxonomies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    taxonomy TEXT NOT NULL,
+    name TEXT NOT NULL,
+    slug TEXT NOT NULL,
+    description TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(taxonomy, slug)
+)');
+
+$pdo->exec('CREATE TABLE IF NOT EXISTS media_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    filename TEXT NOT NULL,
+    path TEXT NOT NULL,
+    mime_type TEXT NOT NULL,
+    size_bytes INTEGER NOT NULL DEFAULT 0,
+    title TEXT,
+    alt_text TEXT,
+    created_by INTEGER,
+    created_at TEXT NOT NULL
+)');
+
+$pdo->exec('CREATE TABLE IF NOT EXISTS roles (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    role_key TEXT NOT NULL UNIQUE,
+    label TEXT NOT NULL,
+    capabilities TEXT NOT NULL DEFAULT "[]",
+    is_system INTEGER NOT NULL DEFAULT 0,
+    sort_order INTEGER NOT NULL DEFAULT 0,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+)');
+
 $pdo->exec('CREATE TABLE IF NOT EXISTS chapter_reads (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     chapter_id INTEGER NOT NULL,

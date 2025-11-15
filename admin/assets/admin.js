@@ -276,6 +276,10 @@ $(function () {
     const inlineEmpty = $('#inline-chapter-empty');
     const inlineSort = $('#inline-chapter-sort');
     const inlineMangaId = $('#inline-chapter-manga-id');
+    const quickForm = $('#quick-chapter-form');
+    const quickMessage = $('#quick-chapter-message');
+    const quickMangaSelect = $('#quick-chapter-manga');
+    const quickStorage = $('#quick-chapter-storage');
     let searchTimer = null;
     let currentMangaId = null;
 
@@ -332,6 +336,10 @@ $(function () {
         fillMangaSelect($('#manga-select'));
         fillMangaSelect($('#bulk-manga-select'));
         fillMangaSelect($('#chapter-list-manga'), 'Seri seçin');
+        fillMangaSelect(quickMangaSelect, 'Seri seçin');
+        if (quickMangaSelect && quickMangaSelect.length) {
+          quickMangaSelect.val('');
+        }
       });
     }
 
@@ -345,6 +353,17 @@ $(function () {
       } else {
         $('#inline-storage-local').prop('checked', true);
         $('#inline-storage-ftp').prop('checked', false);
+      }
+    }
+
+    function applyQuickStorageDefault() {
+      if (!quickStorage.length) {
+        return;
+      }
+      if (defaultStorage === 'ftp') {
+        quickStorage.val('ftp');
+      } else {
+        quickStorage.val('local');
       }
     }
 
@@ -429,6 +448,35 @@ $(function () {
         })
         .fail((xhr) => handleError(xhr, message));
     });
+
+    if (quickForm.length) {
+      applyQuickStorageDefault();
+      quickForm.on('submit', function (event) {
+        event.preventDefault();
+        const formData = new FormData(this);
+        if (!formData.get('manga_id')) {
+          showMessage(quickMessage, 'danger', 'Önce bir manga seçmelisiniz.');
+          return;
+        }
+        $.ajax({
+          url: 'api.php?action=create-chapter',
+          type: 'POST',
+          data: formData,
+          processData: false,
+          contentType: false,
+        })
+          .done((response) => {
+            showMessage(quickMessage, 'success', response.message || 'Bölüm oluşturuldu.');
+            quickForm[0].reset();
+            quickForm.find('input[type="file"]').val('');
+            quickMangaSelect.val('');
+            applyQuickStorageDefault();
+            loadMangaTable();
+            refreshDashboardStats();
+          })
+          .fail((xhr) => handleError(xhr, quickMessage));
+      });
+    }
 
     $('#refresh-manga-list').on('click', loadMangaTable);
     statusFilter.on('change', loadMangaTable);
@@ -595,6 +643,7 @@ $(function () {
     refreshMangaOptions();
     loadMangaTable();
     disableInlineForm();
+    applyQuickStorageDefault();
   }
   function initChapters() {
     const singleForm = $('#chapter-form');
@@ -1684,6 +1733,91 @@ $(function () {
     const createUserMessage = $('#create-user-message');
     const adForm = $('#ad-form');
     const adMessage = $('#ad-form-message');
+    const roleForm = $('#role-form');
+    const roleMessage = $('#role-form-message');
+    const roleReset = $('#role-reset');
+    const roleTableBody = $('#role-table tbody');
+    const roleTableEmpty = $('#role-table-empty');
+    const roleCurrentField = $('#role-current-key');
+    const roleKeyField = $('#role-key');
+    const roleLabelField = $('#role-label');
+    const roleCapabilitiesField = $('#role-capabilities');
+    const roleOrderField = $('#role-order');
+    const roleSubmitButton = roleForm.find('button[type="submit"]');
+    let roles = [];
+    let roleMap = {};
+    let rolesLoaded = false;
+
+    function renderCapabilities(capabilities) {
+      if (!Array.isArray(capabilities) || !capabilities.length) {
+        return '<span class="text-muted">—</span>';
+      }
+      return capabilities
+        .map((capability) => `<span class="badge bg-secondary bg-opacity-50 text-uppercase me-1 mb-1">${escapeHtml(capability)}</span>`)
+        .join('');
+    }
+
+    function renderRoleOptions() {
+      const select = createUserForm.find('select[name="role"]');
+      if (!select.length) {
+        return;
+      }
+      const previous = select.val();
+      select.empty();
+      roles.forEach((role) => {
+        select.append(`<option value="${escapeHtml(role.role_key)}">${escapeHtml(role.label)}</option>`);
+      });
+      if (previous && roleMap[previous]) {
+        select.val(previous);
+      } else if (roleMap.member) {
+        select.val('member');
+      } else if (roles[0]) {
+        select.val(roles[0].role_key);
+      }
+    }
+
+    function renderRoleTable() {
+      roleTableBody.empty();
+      if (!roles.length) {
+        roleTableEmpty.removeClass('d-none');
+        return;
+      }
+      roleTableEmpty.addClass('d-none');
+      roles.forEach((role) => {
+        roleTableBody.append(`
+          <tr data-role-key="${escapeHtml(role.role_key)}">
+            <td>
+              <div class="fw-semibold">${escapeHtml(role.label)}</div>
+              ${role.is_system ? '<div class="small text-muted">Sistem rolü</div>' : ''}
+            </td>
+            <td><code>${escapeHtml(role.role_key)}</code></td>
+            <td>
+              <div class="d-flex flex-wrap gap-1">${renderCapabilities(role.capabilities)}</div>
+            </td>
+            <td class="text-end">
+              <div class="btn-group btn-group-sm" role="group">
+                <button class="btn btn-outline-light role-edit" type="button"><i class="bi bi-pencil"></i></button>
+                ${role.is_system ? '' : '<button class="btn btn-outline-danger role-delete" type="button"><i class="bi bi-trash"></i></button>'}
+              </div>
+            </td>
+          </tr>`);
+      });
+    }
+
+    function loadRoles(next) {
+      $.getJSON('api.php', { action: 'list-roles' })
+        .done(({ data }) => {
+          roles = Array.isArray(data) ? data : [];
+          roleMap = roles.reduce((acc, role) => ({ ...acc, [role.role_key]: role }), {});
+          rolesLoaded = true;
+          renderRoleOptions();
+          renderRoleTable();
+          if (typeof next === 'function') {
+            next();
+          }
+        })
+        .fail((xhr) => handleError(xhr, roleMessage));
+    }
 
     function renderUserRow(user) {
       const initial = (user.username || '?').charAt(0).toUpperCase();
@@ -1691,6 +1825,16 @@ $(function () {
         ? `<img src="${user.avatar_url}" alt="${escapeHtml(user.username)}" class="rounded-circle me-2" width="36" height="36">`
         : `<div class="avatar-placeholder rounded-circle me-2">${initial}</div>`;
       const active = Number(user.is_active) === 1;
+      const roleKey = user.role && roleMap[user.role] ? user.role : user.role || (roleMap.member ? 'member' : roles[0]?.role_key || '');
+      let options = roles
+        .map((role) => `<option value="${escapeHtml(role.role_key)}" ${role.role_key === roleKey ? 'selected' : ''}>${escapeHtml(role.label)}</option>`)
+        .join('');
+      if ((!options || !options.length) && roleKey) {
+        options = `<option value="${escapeHtml(roleKey)}" selected>${escapeHtml(user.role_label || roleKey)}</option>`;
+      } else if (roleKey && !roleMap[roleKey]) {
+        options += `<option value="${escapeHtml(roleKey)}" selected>${escapeHtml(user.role_label || roleKey)}</option>`;
+      }
+      const capabilitiesHtml = renderCapabilities(roleMap[roleKey]?.capabilities || user.role_capabilities || []);
       return `
         <tr data-user-id="${user.id}">
           <td>
@@ -1704,10 +1848,9 @@ $(function () {
           </td>
           <td>
             <select class="form-select form-select-sm user-role">
-              <option value="member" ${user.role === 'member' ? 'selected' : ''}>Üye</option>
-              <option value="editor" ${user.role === 'editor' ? 'selected' : ''}>Editör</option>
-              <option value="admin" ${user.role === 'admin' ? 'selected' : ''}>Yönetici</option>
+              ${options}
             </select>
+            <div class="user-role-capabilities mt-2">${capabilitiesHtml}</div>
           </td>
           <td class="text-center">
             <div class="form-check form-switch d-flex justify-content-center">
@@ -1725,6 +1868,10 @@ $(function () {
     }
 
     function loadUsers() {
+      if (!rolesLoaded) {
+        loadRoles(loadUsers);
+        return;
+      }
       userTableBody.html('<tr><td colspan="4" class="text-center text-muted">Yükleniyor...</td></tr>');
       $.getJSON('api.php', { action: 'list-users' })
         .done(({ data }) => {
@@ -1740,6 +1887,14 @@ $(function () {
         });
     }
 
+    function resetRoleForm() {
+      roleForm[0]?.reset();
+      roleCurrentField.val('');
+      roleKeyField.prop('disabled', false);
+      roleSubmitButton.html('<i class="bi bi-save me-1"></i>Rolü Kaydet');
+      roleMessage.empty();
+    }
+
     createUserForm.on('submit', function (event) {
       event.preventDefault();
       const payload = createUserForm.serializeArray();
@@ -1750,6 +1905,7 @@ $(function () {
         .done((response) => {
           showMessage(createUserMessage, 'success', response.message || 'Üye oluşturuldu.');
           createUserForm.trigger('reset');
+          renderRoleOptions();
           loadUsers();
           refreshDashboardStats();
         })
@@ -1773,6 +1929,7 @@ $(function () {
         .done((response) => {
           message.addClass('text-success').text(response.message || 'Üye güncellendi.');
           row.find('.user-password').val('');
+          row.find('.user-role-capabilities').html(renderCapabilities(roleMap[role]?.capabilities || []));
           refreshDashboardStats();
         })
         .fail((xhr) => {
@@ -1783,6 +1940,73 @@ $(function () {
           const error = xhr.responseJSON?.error || 'Güncelleme başarısız';
           message.addClass('text-danger').text(error);
         });
+    });
+
+    userTableBody.on('change', '.user-role', function () {
+      const selectedRole = $(this).val();
+      const capabilities = renderCapabilities(roleMap[selectedRole]?.capabilities || []);
+      $(this).closest('tr').find('.user-role-capabilities').html(capabilities);
+    });
+
+    roleForm.on('submit', function (event) {
+      event.preventDefault();
+      const currentKey = roleCurrentField.val();
+      const payload = {
+        role_key: currentKey ? currentKey : roleKeyField.val(),
+        label: roleLabelField.val(),
+        capabilities: roleCapabilitiesField.val(),
+        sort_order: roleOrderField.val(),
+      };
+      let action = 'create-role';
+      if (currentKey) {
+        action = 'update-role';
+        payload.new_role_key = roleKeyField.val();
+      }
+      $.post(`api.php?action=${action}`, payload)
+        .done((response) => {
+          showMessage(roleMessage, 'success', response.message || 'Rol kaydedildi.');
+          resetRoleForm();
+          loadRoles(loadUsers);
+        })
+        .fail((xhr) => handleError(xhr, roleMessage));
+    });
+
+    roleReset.on('click', function (event) {
+      event.preventDefault();
+      resetRoleForm();
+    });
+
+    roleTableBody.on('click', '.role-edit', function () {
+      const key = $(this).closest('tr').data('role-key');
+      const role = roleMap[key];
+      if (!role) {
+        return;
+      }
+      roleCurrentField.val(role.role_key);
+      roleKeyField.val(role.role_key);
+      roleLabelField.val(role.label);
+      roleCapabilitiesField.val((role.capabilities || []).join(', '));
+      roleOrderField.val(role.sort_order);
+      roleKeyField.prop('disabled', Number(role.is_system) === 1);
+      roleSubmitButton.html('<i class="bi bi-save me-1"></i>Rolü Güncelle');
+      roleMessage.empty();
+      roleLabelField.trigger('focus');
+    });
+
+    roleTableBody.on('click', '.role-delete', function () {
+      const key = $(this).closest('tr').data('role-key');
+      if (!key || !window.confirm('Bu rolü silmek istediğinize emin misiniz?')) {
+        return;
+      }
+      $.post('api.php?action=delete-role', { role_key: key })
+        .done((response) => {
+          showMessage(roleMessage, 'success', response.message || 'Rol silindi.');
+          if (roleCurrentField.val() === key) {
+            resetRoleForm();
+          }
+          loadRoles(loadUsers);
+        })
+        .fail((xhr) => handleError(xhr, roleMessage));
     });
 
     function loadAdSettings() {
@@ -1804,7 +2028,7 @@ $(function () {
         .fail((xhr) => handleError(xhr, adMessage));
     });
 
-    loadUsers();
+    loadRoles(loadUsers);
     loadAdSettings();
   }
 
@@ -1859,6 +2083,590 @@ $(function () {
     loadKiSettings();
   }
 
+  function initPosts() {
+    const form = $('#post-form');
+    const message = $('#post-form-message');
+    const resetButton = $('#post-reset');
+    const tableBody = $('#post-table tbody');
+    const emptyState = $('#post-table-empty');
+    const statusFilter = $('#post-status-filter');
+    const searchInput = $('#post-search');
+    const refreshButton = $('#post-refresh');
+    const categoryForm = $('#category-form');
+    const categoryMessage = $('#category-message');
+    const categoryList = $('#category-list');
+    const tagForm = $('#tag-form');
+    const tagMessage = $('#tag-message');
+    const tagList = $('#tag-list');
+    const authorSelect = $('#post-author');
+    const tagsInput = $('#post-tags');
+    const categorySelect = $('#post-categories');
+    let searchTimer = null;
+    let editingPostId = null;
+    let categoryMap = {};
+    let tagMap = {};
+
+    function renderPostRow(post) {
+      const categories = (post.categories || []).map((slug) => escapeHtml(categoryMap[slug]?.name || slug)).join(', ');
+      const author = post.author_id ? `#${post.author_id}` : 'Belirtilmemiş';
+      return `
+        <tr data-post-id="${post.id}">
+          <td>
+            <div class="fw-semibold">${escapeHtml(post.title)}</div>
+            <div class="small text-muted">${escapeHtml(post.slug)}</div>
+          </td>
+          <td>${post.status === 'published' ? '<span class="badge bg-success">Yayınlandı</span>' : '<span class="badge bg-secondary">Taslak</span>'}</td>
+          <td>${categories || '<span class="text-muted">—</span>'}</td>
+          <td>${escapeHtml(author)}</td>
+          <td>${formatDateTime(post.updated_at || post.created_at)}</td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm" role="group">
+              <button class="btn btn-outline-light post-edit" type="button"><i class="bi bi-pencil"></i></button>
+              <button class="btn btn-outline-danger post-delete" type="button"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>`;
+    }
+
+    function populateCategoryOptions() {
+      if (!categorySelect.length) {
+        return;
+      }
+      const currentSelection = categorySelect.val();
+      categorySelect.empty();
+      Object.values(categoryMap)
+        .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
+        .forEach((category) => {
+          categorySelect.append(`<option value="${escapeHtml(category.slug)}">${escapeHtml(category.name)}</option>`);
+        });
+      if (currentSelection) {
+        categorySelect.val(currentSelection);
+      }
+    }
+
+    function renderTaxonomyItems(container, items, type) {
+      container.empty();
+      if (!items.length) {
+        container.append('<div class="text-muted small">Henüz kayıt yok.</div>');
+        return;
+      }
+      items.forEach((item) => {
+        container.append(`
+          <div class="taxonomy-item" data-taxonomy="${type}" data-id="${item.id}">
+            <div class="d-flex justify-content-between align-items-start gap-3">
+              <div>
+                <div class="fw-semibold">${escapeHtml(item.name)}</div>
+                <div class="small text-muted">${escapeHtml(item.slug)}</div>
+              </div>
+              <div class="btn-group btn-group-sm" role="group">
+                <button class="btn btn-outline-light taxonomy-edit" type="button"><i class="bi bi-pencil"></i></button>
+                <button class="btn btn-outline-danger taxonomy-delete" type="button"><i class="bi bi-trash"></i></button>
+              </div>
+            </div>
+            ${item.description ? `<p class="small text-muted mb-0 mt-2">${escapeHtml(item.description)}</p>` : ''}
+          </div>`);
+      });
+    }
+
+    function loadTaxonomy(type) {
+      const targetList = type === 'category' ? categoryList : tagList;
+      const targetMessage = type === 'category' ? categoryMessage : tagMessage;
+      $.getJSON('api.php', { action: 'list-taxonomies', taxonomy: type })
+        .done(({ data }) => {
+          const items = data || [];
+          if (type === 'category') {
+            categoryMap = items.reduce((acc, item) => ({ ...acc, [item.slug]: item }), {});
+            populateCategoryOptions();
+          } else {
+            tagMap = items.reduce((acc, item) => ({ ...acc, [item.slug]: item }), {});
+          }
+          renderTaxonomyItems(targetList, items, type);
+          if (targetMessage.length) {
+            targetMessage.empty();
+          }
+        })
+        .fail((xhr) => handleError(xhr, targetMessage));
+    }
+
+    function loadPosts() {
+      tableBody.html('<tr><td colspan="6" class="text-center text-muted">Yükleniyor...</td></tr>');
+      emptyState.addClass('d-none');
+      $.getJSON('api.php', {
+        action: 'list-posts',
+        status: statusFilter.val(),
+        search: searchInput.val(),
+      })
+        .done(({ data }) => {
+          tableBody.empty();
+          if (!data || !data.length) {
+            emptyState.removeClass('d-none');
+            return;
+          }
+          data.forEach((post) => tableBody.append(renderPostRow(post)));
+        })
+        .fail((xhr) => {
+          tableBody.html('<tr><td colspan="6" class="text-center text-danger">Yazılar alınamadı.</td></tr>');
+          handleError(xhr, message);
+        });
+    }
+
+    function resetPostForm() {
+      editingPostId = null;
+      form[0].reset();
+      categorySelect.val([]);
+      $('#post-id').val('');
+      message.empty();
+    }
+
+    function loadAuthors() {
+      if (!authorSelect.length) {
+        return;
+      }
+      $.getJSON('api.php', { action: 'list-users' }).done(({ data }) => {
+        authorSelect.find('option:not(:first)').remove();
+        (data || []).forEach((user) => {
+          authorSelect.append(`<option value="${user.id}">${escapeHtml(user.username)}</option>`);
+        });
+      });
+    }
+
+    form.on('submit', function (event) {
+      event.preventDefault();
+      const formData = new FormData(this);
+      const id = editingPostId;
+      if (id) {
+        formData.append('id', String(id));
+      }
+      $.ajax({
+        url: `api.php?action=${id ? 'update-post' : 'create-post'}`,
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+      })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Yazı kaydedildi.');
+          resetPostForm();
+          loadPosts();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    resetButton.on('click', resetPostForm);
+
+    statusFilter.on('change', loadPosts);
+    refreshButton.on('click', loadPosts);
+    searchInput.on('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadPosts, 250);
+    });
+
+    tableBody.on('click', '.post-edit', function () {
+      const postId = $(this).closest('tr').data('post-id');
+      if (!postId) {
+        return;
+      }
+      $.getJSON('api.php', { action: 'get-post', id: postId })
+        .done(({ data }) => {
+          if (!data) {
+            return;
+          }
+          editingPostId = data.id;
+          $('#post-id').val(data.id);
+          $('#post-title').val(data.title);
+          $('#post-slug').val(data.slug);
+          $('#post-status').val(data.status);
+          $('#post-featured').val(data.featured_image);
+          $('#post-excerpt').val(data.excerpt);
+          $('#post-content').val(data.content);
+          $('#post-author').val(data.author_id || '');
+          categorySelect.val(data.categories || []);
+          tagsInput.val((data.tags || []).join(', '));
+          message.empty();
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        });
+    });
+
+    tableBody.on('click', '.post-delete', function () {
+      const postId = $(this).closest('tr').data('post-id');
+      if (!postId || !window.confirm('Bu yazıyı silmek istediğinize emin misiniz?')) {
+        return;
+      }
+      $.post('api.php?action=delete-post', { id: postId })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Yazı silindi.');
+          loadPosts();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    function handleTaxonomySubmit(type, formEl, messageEl) {
+      formEl.on('submit', function (event) {
+        event.preventDefault();
+        const idField = type === 'category' ? $('#category-id') : $('#tag-id');
+        const nameField = type === 'category' ? $('#category-name') : $('#tag-name');
+        const slugField = type === 'category' ? $('#category-slug') : $('#tag-slug');
+        const descField = type === 'category' ? $('#category-description') : null;
+        const payload = {
+          taxonomy: type,
+          name: nameField.val(),
+          slug: slugField.val(),
+        };
+        const currentId = Number(idField.val());
+        if (descField) {
+          payload.description = descField.val();
+        }
+        if (currentId) {
+          payload.id = currentId;
+        }
+        $.post('api.php?action=save-taxonomy', payload)
+          .done((response) => {
+            showMessage(messageEl, 'success', response.message || 'Kayıt güncellendi.');
+            idField.val('');
+            formEl[0].reset();
+            loadTaxonomy(type);
+          })
+          .fail((xhr) => handleError(xhr, messageEl));
+      });
+    }
+
+    handleTaxonomySubmit('category', categoryForm, categoryMessage);
+    handleTaxonomySubmit('tag', tagForm, tagMessage);
+
+    categoryList.on('click', '.taxonomy-edit', function () {
+      const item = $(this).closest('.taxonomy-item');
+      const id = item.data('id');
+      const slug = item.find('.small.text-muted').text();
+      const name = item.find('.fw-semibold').text();
+      $('#category-id').val(id);
+      $('#category-name').val(name);
+      $('#category-slug').val(slug);
+      const desc = item.find('p.small').text();
+      $('#category-description').val(desc);
+      categoryMessage.empty();
+    });
+
+    tagList.on('click', '.taxonomy-edit', function () {
+      const item = $(this).closest('.taxonomy-item');
+      $('#tag-id').val(item.data('id'));
+      $('#tag-name').val(item.find('.fw-semibold').text());
+      $('#tag-slug').val(item.find('.small.text-muted').text());
+      tagMessage.empty();
+    });
+
+    function handleTaxonomyDelete(listEl, type, messageEl) {
+      listEl.on('click', '.taxonomy-delete', function () {
+        const item = $(this).closest('.taxonomy-item');
+        const id = item.data('id');
+        if (!id || !window.confirm('Bu kaydı silmek istediğinize emin misiniz?')) {
+          return;
+        }
+        $.post('api.php?action=delete-taxonomy', { taxonomy: type, id })
+          .done((response) => {
+            showMessage(messageEl, 'success', response.message || 'Kayıt silindi.');
+            loadTaxonomy(type);
+          })
+          .fail((xhr) => handleError(xhr, messageEl));
+      });
+    }
+
+    handleTaxonomyDelete(categoryList, 'category', categoryMessage);
+    handleTaxonomyDelete(tagList, 'tag', tagMessage);
+
+    $('#category-reset').on('click', () => {
+      $('#category-form')[0].reset();
+      $('#category-id').val('');
+      categoryMessage.empty();
+    });
+
+    $('#tag-reset').on('click', () => {
+      $('#tag-form')[0].reset();
+      $('#tag-id').val('');
+      tagMessage.empty();
+    });
+
+    loadAuthors();
+    loadTaxonomy('category');
+    loadTaxonomy('tag');
+    loadPosts();
+  }
+
+  function initMedia() {
+    const form = $('#media-form');
+    const message = $('#media-form-message');
+    const tableBody = $('#media-table tbody');
+    const emptyState = $('#media-empty');
+    const searchInput = $('#media-search');
+    const refreshButton = $('#media-refresh');
+    let searchTimer = null;
+
+    function renderMediaRow(item) {
+      const isImage = item.mime_type && item.mime_type.startsWith('image/');
+      const preview = isImage
+        ? `<img src="${item.full_url}" alt="${escapeHtml(item.title || item.filename)}" class="rounded" style="width:64px;height:64px;object-fit:cover;">`
+        : '<div class="bg-secondary bg-opacity-25 rounded d-inline-flex align-items-center justify-content-center" style="width:64px;height:64px;"><i class="bi bi-file-earmark-text"></i></div>';
+      const size = item.size_bytes ? `${(item.size_bytes / 1024).toFixed(1)} KB` : '—';
+      return `
+        <tr data-media-id="${item.id}">
+          <td>${preview}</td>
+          <td>
+            <div class="fw-semibold">${escapeHtml(item.title || item.filename)}</div>
+            <a href="${item.full_url}" target="_blank" rel="noopener" class="small text-decoration-none">${escapeHtml(item.filename)}</a>
+          </td>
+          <td>${escapeHtml(item.mime_type)}</td>
+          <td>${size}</td>
+          <td>${item.created_by || '—'}</td>
+          <td>${formatDateTime(item.created_at)}</td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm" role="group">
+              <a class="btn btn-outline-light" href="${item.full_url}" target="_blank" rel="noopener"><i class="bi bi-box-arrow-up-right"></i></a>
+              <button class="btn btn-outline-danger media-delete" type="button"><i class="bi bi-trash"></i></button>
+            </div>
+          </td>
+        </tr>`;
+    }
+
+    function loadMedia() {
+      tableBody.html('<tr><td colspan="7" class="text-center text-muted">Yükleniyor...</td></tr>');
+      emptyState.addClass('d-none');
+      $.getJSON('api.php', {
+        action: 'list-media',
+        search: searchInput.val(),
+      })
+        .done(({ data }) => {
+          tableBody.empty();
+          if (!data || !data.length) {
+            emptyState.removeClass('d-none');
+            return;
+          }
+          data.forEach((item) => tableBody.append(renderMediaRow(item)));
+        })
+        .fail((xhr) => {
+          tableBody.html('<tr><td colspan="7" class="text-center text-danger">Medya listesi alınamadı.</td></tr>');
+          handleError(xhr, message);
+        });
+    }
+
+    form.on('submit', function (event) {
+      event.preventDefault();
+      const formData = new FormData(this);
+      $.ajax({
+        url: 'api.php?action=upload-media',
+        type: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+      })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Dosya yüklendi.');
+          form[0].reset();
+          loadMedia();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    refreshButton.on('click', loadMedia);
+    searchInput.on('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadMedia, 250);
+    });
+
+    tableBody.on('click', '.media-delete', function () {
+      const mediaId = $(this).closest('tr').data('media-id');
+      if (!mediaId || !window.confirm('Bu dosyayı silmek istediğinize emin misiniz?')) {
+        return;
+      }
+      $.post('api.php?action=delete-media', { id: mediaId })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Dosya silindi.');
+          loadMedia();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    loadMedia();
+  }
+
+  function initComments() {
+    const tableBody = $('#comment-table tbody');
+    const emptyState = $('#comment-empty');
+    const statusFilter = $('#comment-status-filter');
+    const searchInput = $('#comment-search');
+    const refreshButton = $('#comment-refresh');
+    const message = $('#comment-message');
+    const purgeButton = $('#purge-comments');
+    let searchTimer = null;
+
+    function renderCommentRow(comment, status) {
+      const mangaLabel = comment.manga_title ? `<span class="badge bg-info text-dark">${escapeHtml(comment.manga_title)}</span>` : '<span class="text-muted">—</span>';
+      return `
+        <tr data-comment-id="${comment.id}">
+          <td>
+            <div class="fw-semibold">${escapeHtml(comment.body.substring(0, 120))}${comment.body.length > 120 ? '…' : ''}</div>
+          </td>
+          <td>
+            <div class="fw-semibold">${escapeHtml(comment.username)}</div>
+            <div class="small text-muted">${escapeHtml(comment.email || '')}</div>
+          </td>
+          <td>${mangaLabel}</td>
+          <td>${formatDateTime(comment.created_at)}</td>
+          <td class="text-end">
+            <div class="btn-group btn-group-sm" role="group">
+              ${status === 'trash'
+                ? '<button class="btn btn-outline-light comment-restore" type="button"><i class="bi bi-arrow-counterclockwise"></i></button>'
+                : '<button class="btn btn-outline-danger comment-trash" type="button"><i class="bi bi-trash"></i></button>'}
+            </div>
+          </td>
+        </tr>`;
+    }
+
+    function loadComments() {
+      tableBody.html('<tr><td colspan="5" class="text-center text-muted">Yükleniyor...</td></tr>');
+      emptyState.addClass('d-none');
+      const status = statusFilter.val();
+      $.getJSON('api.php', {
+        action: 'list-comments-admin',
+        status,
+        search: searchInput.val(),
+      })
+        .done(({ data }) => {
+          tableBody.empty();
+          if (!data || !data.length) {
+            emptyState.removeClass('d-none');
+            return;
+          }
+          data.forEach((comment) => tableBody.append(renderCommentRow(comment, status)));
+        })
+        .fail((xhr) => handleError(xhr, message));
+    }
+
+    statusFilter.on('change', loadComments);
+    refreshButton.on('click', loadComments);
+    searchInput.on('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(loadComments, 250);
+    });
+
+    tableBody.on('click', '.comment-trash', function () {
+      const id = $(this).closest('tr').data('comment-id');
+      if (!id) {
+        return;
+      }
+      $.post('api.php?action=trash-comment', { id })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Yorum çöp kutusuna taşındı.');
+          loadComments();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    tableBody.on('click', '.comment-restore', function () {
+      const id = $(this).closest('tr').data('comment-id');
+      if (!id) {
+        return;
+      }
+      $.post('api.php?action=restore-comment', { id })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Yorum geri yüklendi.');
+          loadComments();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    purgeButton.on('click', function (event) {
+      event.preventDefault();
+      if (!window.confirm('Çöp kutusundaki tüm yorumları kalıcı olarak silmek istiyor musunuz?')) {
+        return;
+      }
+      $.post('api.php?action=purge-comments')
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Çöp kutusu temizlendi.');
+          loadComments();
+        })
+        .fail((xhr) => handleError(xhr, message));
+    });
+
+    loadComments();
+  }
+
+  function initPlugins() {
+    const list = $('#plugin-list');
+    const message = $('#plugin-message');
+    let plugins = [];
+
+    function renderPlugins() {
+      list.empty();
+      if (!plugins.length) {
+        list.append('<div class="text-muted">Yüklü eklenti bulunamadı.</div>');
+        return;
+      }
+      plugins.forEach((plugin) => {
+        list.append(`
+          <div class="col-md-6" data-plugin-key="${plugin.key}">
+            <div class="card admin-card h-100">
+              <div class="card-body d-flex flex-column gap-2">
+                <div class="d-flex justify-content-between align-items-start gap-2">
+                  <div>
+                    <h3 class="h5 mb-0">${escapeHtml(plugin.name)}</h3>
+                    <div class="small text-muted">v${escapeHtml(plugin.version)} · ${escapeHtml(plugin.category)}</div>
+                  </div>
+                  <div class="form-check form-switch">
+                    <input class="form-check-input plugin-toggle" type="checkbox" ${plugin.is_active ? 'checked' : ''}>
+                  </div>
+                </div>
+                <p class="text-muted small mb-0 flex-grow-1">${escapeHtml(plugin.description)}</p>
+                <div class="d-flex justify-content-between align-items-center small text-muted">
+                  <span>Geliştirici: ${escapeHtml(plugin.author || 'Topluluk')}</span>
+                  <span>${plugin.is_active ? '<span class="badge bg-success">Aktif</span>' : '<span class="badge bg-secondary">Pasif</span>'}</span>
+                </div>
+              </div>
+            </div>
+          </div>`);
+      });
+    }
+
+    function savePlugins() {
+      const activeKeys = plugins.filter((plugin) => plugin.is_active).map((plugin) => plugin.key);
+      $.post('api.php?action=save-plugins', { active: JSON.stringify(activeKeys) })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Eklenti ayarları güncellendi.');
+        })
+        .fail((xhr) => handleError(xhr, message));
+    }
+
+    list.on('change', '.plugin-toggle', function () {
+      const key = $(this).closest('[data-plugin-key]').data('plugin-key');
+      plugins = plugins.map((plugin) => (plugin.key === key ? { ...plugin, is_active: this.checked } : plugin));
+      savePlugins();
+      renderPlugins();
+    });
+
+    $.getJSON('api.php', { action: 'list-plugins' })
+      .done(({ data }) => {
+        plugins = data || [];
+        renderPlugins();
+      })
+      .fail((xhr) => handleError(xhr, message));
+  }
+
+  function initTools() {
+    const message = $('#tool-message');
+    $('#tool-list').on('click', '[data-tool]', function () {
+      const tool = $(this).data('tool');
+      if (!tool) {
+        return;
+      }
+      const button = $(this);
+      button.prop('disabled', true);
+      $.post('api.php?action=run-tool', { tool })
+        .done((response) => {
+          showMessage(message, 'success', response.message || 'Araç başarıyla çalıştırıldı.');
+        })
+        .fail((xhr) => handleError(xhr, message))
+        .always(() => button.prop('disabled', false));
+    });
+  }
+
   if (page === 'dashboard') {
     initDashboard();
   }
@@ -1880,11 +2688,26 @@ $(function () {
   if (page === 'widgets') {
     initWidgets();
   }
+  if (page === 'posts') {
+    initPosts();
+  }
+  if (page === 'media') {
+    initMedia();
+  }
   if (page === 'pages') {
     initPages();
   }
+  if (page === 'comments') {
+    initComments();
+  }
   if (page === 'menus') {
     initMenus();
+  }
+  if (page === 'plugins') {
+    initPlugins();
+  }
+  if (page === 'tools') {
+    initTools();
   }
   if (page === 'community') {
     initCommunity();

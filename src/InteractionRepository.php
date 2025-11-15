@@ -93,6 +93,54 @@ class InteractionRepository
         }, $rows);
     }
 
+    /**
+     * @param array{status?:string,search?:string} $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listForAdmin(array $filters = []): array
+    {
+        $where = [];
+        $params = [];
+
+        $status = strtolower((string) ($filters['status'] ?? 'active'));
+        if ($status === 'trash') {
+            $where[] = 'comments.is_deleted = 1';
+        } else {
+            $where[] = 'comments.is_deleted = 0';
+        }
+
+        if (!empty($filters['search'])) {
+            $where[] = '(comments.body LIKE :search OR users.username LIKE :search OR users.email LIKE :search)';
+            $params[':search'] = '%' . $filters['search'] . '%';
+        }
+
+        $sql = 'SELECT comments.*, users.username, users.email, mangas.title AS manga_title, mangas.slug AS manga_slug
+            FROM comments
+            INNER JOIN users ON users.id = comments.user_id
+            LEFT JOIN mangas ON mangas.id = comments.manga_id';
+        if ($where) {
+            $sql .= ' WHERE ' . implode(' AND ', $where);
+        }
+        $sql .= ' ORDER BY comments.created_at DESC LIMIT 200';
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $commentIds = array_map(static fn(array $row): int => (int) $row['id'], $rows);
+        $reactionMap = $this->getReactionSummary($commentIds);
+
+        return array_map(function (array $row) use ($reactionMap): array {
+            $id = (int) $row['id'];
+            $row['id'] = $id;
+            $row['user_id'] = (int) $row['user_id'];
+            $row['manga_id'] = $row['manga_id'] !== null ? (int) $row['manga_id'] : null;
+            $row['chapter_id'] = $row['chapter_id'] !== null ? (int) $row['chapter_id'] : null;
+            $row['reaction_summary'] = $reactionMap[$id] ?? [];
+
+            return $row;
+        }, $rows);
+    }
+
     public function createComment(int $userId, array $data): array
     {
         $body = trim($data['body'] ?? '');
@@ -184,6 +232,24 @@ class InteractionRepository
         }
 
         return $this->getReactionSummary([$commentId])[$commentId] ?? [];
+    }
+
+    public function setDeleted(int $commentId, bool $deleted = true): bool
+    {
+        $stmt = $this->db->prepare('UPDATE comments SET is_deleted = :deleted, updated_at = :updated WHERE id = :id');
+        return $stmt->execute([
+            ':deleted' => $deleted ? 1 : 0,
+            ':updated' => (new DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ':id' => $commentId,
+        ]);
+    }
+
+    public function purgeDeleted(): int
+    {
+        $stmt = $this->db->prepare('DELETE FROM comments WHERE is_deleted = 1');
+        $stmt->execute();
+
+        return (int) $stmt->rowCount();
     }
 
     /**
