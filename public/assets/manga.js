@@ -22,11 +22,11 @@ $(function () {
     if (!followBtn.length || !unfollowBtn.length) {
       return;
     }
-    followBtn.toggleClass('d-none', !!isFollowing);
-    unfollowBtn.toggleClass('d-none', !isFollowing);
+    followBtn.toggleClass('hidden', !!isFollowing);
+    unfollowBtn.toggleClass('hidden', !isFollowing);
     followBtn.prop('disabled', false);
     unfollowBtn.prop('disabled', false);
-    followInfo.text(formatFollowers(followerCount)).removeClass('d-none');
+    followInfo.text(formatFollowers(followerCount)).removeClass('hidden');
   };
 
   const ensureLoggedIn = () => {
@@ -101,18 +101,18 @@ $(function () {
       }
 
       if (!chapters.length) {
-        $('#chapter-list').append('<div class="list-group-item bg-dark text-secondary">Henüz bölüm eklenmedi.</div>');
+        $('#chapter-list').append('<div class="list-group-item text-muted">Henüz bölüm eklenmedi.</div>');
         return;
       }
 
       chapters.forEach((chapter) => {
         const url = `chapter.php?slug=${encodeURIComponent(data.slug)}&chapter=${encodeURIComponent(chapter.number)}`;
-        const badge = `<span class="badge bg-primary rounded-pill">${chapter.number}</span>`;
+        const badge = `<span class="badge">${chapter.number}</span>`;
         $('#chapter-list').append(`
-          <a class="list-group-item list-group-item-action bg-dark text-light d-flex justify-content-between align-items-center" href="${url}">
+          <a class="list-group-item" href="${url}">
             <div>
               <strong>${chapter.title || 'Bölüm ' + chapter.number}</strong>
-              <div class="small text-secondary">${new Date(chapter.created_at).toLocaleString('tr-TR')}</div>
+              <div class="text-sm text-muted">${new Date(chapter.created_at).toLocaleString('tr-TR')}</div>
             </div>
             ${badge}
           </a>
@@ -120,7 +120,7 @@ $(function () {
       });
     })
     .fail((xhr) => {
-      $('#manga-detail').html(`<div class="alert alert-danger">Seri yüklenirken bir hata oluştu: ${xhr.responseJSON?.error || xhr.statusText}</div>`);
+      $('#manga-detail').html(`<div class="alert">Seri yüklenirken bir hata oluştu: ${xhr.responseJSON?.error || xhr.statusText}</div>`);
     });
 });
 

@@ -24,7 +24,7 @@ $(function () {
         container.empty();
 
         if (!data.length) {
-          container.append('<div class="col-12"><div class="empty-state">Henüz sonuç bulunamadı.</div></div>');
+          container.append('<div class="empty-state col-span-full">Henüz sonuç bulunamadı.</div>');
           return;
         }
 
@@ -33,7 +33,7 @@ $(function () {
         });
       })
       .fail((xhr) => {
-        $('#manga-list').html(`<div class="col-12"><div class="empty-state empty-state--danger">Listeler alınamadı: ${xhr.responseJSON?.error || xhr.statusText}</div></div>`);
+        container.html(`<div class="empty-state empty-state--danger col-span-full">Listeler alınamadı: ${xhr.responseJSON?.error || xhr.statusText}</div>`);
       });
   }
 
@@ -58,26 +58,22 @@ $(function () {
       .slice(0, 3)
       .join(', ');
     return `
-      <div class="col-sm-6 col-lg-4 col-xxl-3">
-        <article class="manga-card">
-          <div class="manga-card__media" style="background-image:url('${cover}')">
-            <span class="manga-card__badge">${formatStatus(manga.status)}</span>
-            <div class="manga-card__overlay">
-              <h3 class="manga-card__title"><a href="${url}">${escapeHtml(manga.title)}</a></h3>
-              <div class="manga-card__overlay-meta">
-                <span><i class="bi bi-person"></i> ${escapeHtml(author)}</span>
-              </div>
-            </div>
+      <article class="manga-card transition duration-300 ease-out hover:-translate-y-1 hover:shadow-xl">
+        <div class="manga-card__media" style="background-image:url('${cover}')">
+          <span class="manga-card__badge">${formatStatus(manga.status)}</span>
+          <div class="manga-card__overlay">
+            <h3 class="manga-card__title"><a href="${url}">${escapeHtml(manga.title)}</a></h3>
+            <span class="manga-card__overlay-meta"><i class="bi bi-person"></i> ${escapeHtml(author)}</span>
           </div>
-          <div class="manga-card__body">
-            <p class="manga-card__description text-truncate-3">${escapeHtml(manga.description || 'Açıklama bulunmuyor.')}</p>
-            <div class="manga-card__footer">
-              <span class="manga-card__genres">${escapeHtml(genres || 'Tür belirtilmedi')}</span>
-              <a href="${url}" class="btn btn-outline-light btn-sm">Seri Detayı</a>
-            </div>
+        </div>
+        <div class="manga-card__body">
+          <p class="manga-card__description text-truncate-3">${escapeHtml(manga.description || 'Açıklama bulunmuyor.')}</p>
+          <div class="manga-card__footer">
+            <span class="manga-card__genres">${escapeHtml(genres || 'Tür belirtilmedi')}</span>
+            <a href="${url}" class="btn btn-outline btn-sm">Seri Detayı</a>
           </div>
-        </article>
-      </div>`;
+        </div>
+      </article>`;
   }
 
   function renderFeaturedHighlight(data) {
@@ -89,7 +85,7 @@ $(function () {
     container.empty();
 
     if (!data.length) {
-      container.append('<div class="feature-placeholder">Popüler seriler yakında burada yer alacak.</div>');
+    container.append('<div class="feature-placeholder">Popüler seriler yakında burada yer alacak.</div>');
       return;
     }
 
@@ -127,8 +123,8 @@ $(function () {
               <dd>${genres}</dd>
             </div>
           </dl>
-          <a class="btn btn-primary btn-sm hero-feature__cta" href="${url}">
-            Seriye Git <i class="bi bi-arrow-right ms-1"></i>
+          <a class="btn btn-primary btn-sm" href="${url}">
+            Seriye Git <i class="bi bi-arrow-right ml-2"></i>
           </a>
         </div>
       </article>
@@ -159,7 +155,7 @@ $(function () {
     container.empty();
 
     if (!data.length) {
-      container.append('<div class="empty-state">Öne çıkan seri bulunamadı.</div>');
+    container.append('<div class="empty-state">Öne çıkan seri bulunamadı.</div>');
       return;
     }
 
@@ -177,7 +173,7 @@ $(function () {
     container.empty();
 
     if (!data.length) {
-      container.append('<div class="col-12"><div class="empty-state">Popüler seri bulunamadı.</div></div>');
+      container.append('<div class="empty-state col-span-full">Popüler seri bulunamadı.</div>');
       return;
     }
 
@@ -229,24 +225,22 @@ $(function () {
     const chapterTitle = chapter.title ? escapeHtml(chapter.title) : `Bölüm ${escapeHtml(chapter.number)}`;
     const seriesTitle = escapeHtml(chapter.manga_title || 'Seri');
     return `
-      <div class="col-xl-4 col-lg-6">
-        <article class="update-card">
-          <div class="update-card__media" style="background-image:url('${cover}')"></div>
-          <div class="update-card__body">
-            <div class="update-card__series">${seriesTitle}</div>
-            <div class="update-card__chapter">Bölüm ${escapeHtml(chapter.number)}</div>
-            <p class="update-card__title text-truncate-3">${chapterTitle}</p>
-            <div class="update-card__meta">
-              <span><i class="bi bi-calendar-event"></i> ${formatDate(chapter.created_at)}</span>
-              ${chapter.ki_cost > 0 ? '<span class="badge bg-warning text-dark">Premium</span>' : ''}
-            </div>
-            <div class="update-card__actions">
-              <a href="${mangaUrl}" class="btn btn-outline-light btn-sm">Seri</a>
-              <a href="${chapterUrl}" class="btn btn-primary btn-sm">Oku</a>
-            </div>
+      <article class="update-card transition duration-300 ease-out hover:-translate-y-1 hover:shadow-xl">
+        <div class="update-card__media" style="background-image:url('${cover}')"></div>
+        <div class="update-card__body">
+          <div class="update-card__series">${seriesTitle}</div>
+          <div class="update-card__chapter">Bölüm ${escapeHtml(chapter.number)}</div>
+          <p class="update-card__title text-truncate-3">${chapterTitle}</p>
+          <div class="update-card__meta">
+            <span><i class="bi bi-calendar-event"></i> ${formatDate(chapter.created_at)}</span>
+            ${chapter.ki_cost > 0 ? '<span class="badge-premium">Premium</span>' : ''}
           </div>
-        </article>
-      </div>`;
+          <div class="update-card__actions">
+            <a href="${mangaUrl}" class="btn btn-outline btn-sm">Seri</a>
+            <a href="${chapterUrl}" class="btn btn-primary btn-sm">Oku</a>
+          </div>
+        </div>
+      </article>`;
   }
 
   function renderLatestList(chapters) {
@@ -257,7 +251,7 @@ $(function () {
     container.empty();
 
     if (!chapters.length) {
-      container.append('<div class="col-12"><div class="empty-state">Yeni bölüm bulunamadı.</div></div>');
+      container.append('<div class="empty-state col-span-full">Yeni bölüm bulunamadı.</div>');
       return;
     }
 
@@ -286,7 +280,7 @@ $(function () {
             <span class="sidebar-item__title">${seriesTitle}</span>
             <span class="sidebar-item__meta">Bölüm ${escapeHtml(chapter.number)}</span>
           </span>
-          ${chapter.ki_cost > 0 ? '<span class="badge bg-warning text-dark">Premium</span>' : ''}
+          ${chapter.ki_cost > 0 ? '<span class="badge-premium">Premium</span>' : ''}
         </a>`);
     });
   }

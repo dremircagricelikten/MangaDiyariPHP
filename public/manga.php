@@ -52,7 +52,8 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     <?php if (!empty($analytics['google'])): ?>
       <?= $analytics['google'] ?>
     <?php endif; ?>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="assets/tailwind.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="assets/styles.css">
     <style>
       :root {
@@ -68,58 +69,58 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     <?php $showSearchForm = false; require __DIR__ . '/partials/site-navbar.php'; ?>
 
     <?php if (!empty($ads['header'])): ?>
-      <section class="ad-slot ad-slot--header py-3">
-        <div class="container">
-          <div class="ad-wrapper text-center">
+      <section class="px-4 py-4">
+        <div class="mx-auto max-w-6xl">
+          <div class="ad-slot">
             <?= $ads['header'] ?>
           </div>
         </div>
       </section>
     <?php endif; ?>
 
-    <main class="container my-4" id="manga-detail" data-slug="<?= htmlspecialchars($slug) ?>">
-      <div class="row g-4">
-        <div class="col-md-4">
-          <div class="cover-wrapper mb-3">
-            <img id="manga-cover" class="img-fluid rounded" alt="Kapak görseli">
+    <main class="px-4 py-10" id="manga-detail" data-slug="<?= htmlspecialchars($slug) ?>">
+      <div class="mx-auto max-w-6xl grid gap-6 lg:grid-cols-3">
+        <div class="space-y-6">
+          <div class="glass-panel p-0 overflow-hidden">
+            <img id="manga-cover" class="w-full h-full object-cover" alt="Kapak görseli">
           </div>
-          <div class="card bg-secondary border-0">
-            <div class="card-body">
-              <h5 class="card-title">Seri Bilgisi</h5>
-              <dl class="row mb-0 small">
-                <dt class="col-4">Durum</dt>
-                <dd class="col-8" id="manga-status">-</dd>
-                <dt class="col-4">Yazar</dt>
-                <dd class="col-8" id="manga-author">-</dd>
-                <dt class="col-4">Türler</dt>
-                <dd class="col-8" id="manga-genres">-</dd>
-                <dt class="col-4">Etiketler</dt>
-                <dd class="col-8" id="manga-tags">-</dd>
-              </dl>
-            </div>
+          <div class="glass-panel space-y-3">
+            <h2 class="text-xl font-semibold text-white">Seri Bilgisi</h2>
+            <dl class="space-y-3 text-sm text-muted">
+              <div class="flex justify-between"><dt>Durum</dt><dd id="manga-status">-</dd></div>
+              <div class="flex justify-between"><dt>Yazar</dt><dd id="manga-author">-</dd></div>
+              <div class="flex justify-between"><dt>Türler</dt><dd id="manga-genres">-</dd></div>
+              <div class="flex justify-between"><dt>Etiketler</dt><dd id="manga-tags">-</dd></div>
+            </dl>
           </div>
           <?php if (!empty($ads['sidebar'])): ?>
-            <div class="ad-slot ad-slot--sidebar mt-4">
+            <div class="ad-slot">
               <?= $ads['sidebar'] ?>
             </div>
           <?php endif; ?>
         </div>
-        <div class="col-md-8">
-          <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 mb-3">
-            <h1 id="manga-title" class="display-6 mb-0 flex-grow-1"></h1>
-            <div id="follow-controls" class="d-flex align-items-center gap-2">
-              <button id="follow-btn" type="button" class="btn btn-primary btn-sm">
-                <span class="follow-btn-text">Takip Et</span>
-              </button>
-              <button id="unfollow-btn" type="button" class="btn btn-outline-light btn-sm d-none">
-                <span class="unfollow-btn-text">Destekten Çık</span>
-              </button>
+        <div class="lg:col-span-2 space-y-6">
+          <div class="glass-panel space-y-4">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h1 id="manga-title" class="text-3xl font-bold text-white mb-0"></h1>
+              <div id="follow-controls" class="flex items-center gap-2">
+                <button id="follow-btn" type="button" class="btn btn-primary btn-sm">
+                  <span class="follow-btn-text">Takip Et</span>
+                </button>
+                <button id="unfollow-btn" type="button" class="btn btn-outline btn-sm hidden">
+                  <span class="unfollow-btn-text">Destekten Çık</span>
+                </button>
+              </div>
             </div>
+            <p id="followers-info" class="text-sm text-muted hidden"></p>
+            <p id="manga-description" class="text-base leading-relaxed"></p>
           </div>
-          <p id="followers-info" class="text-secondary small mb-3 d-none"></p>
-          <p id="manga-description" class="lead"></p>
-          <h2 class="h4 mt-5">Bölümler</h2>
-          <div class="list-group" id="chapter-list"></div>
+          <div class="glass-panel space-y-4">
+            <div class="flex items-center justify-between">
+              <h2 class="text-2xl font-semibold text-white">Bölümler</h2>
+            </div>
+            <div class="list-group" id="chapter-list"></div>
+          </div>
         </div>
       </div>
     </main>
@@ -127,38 +128,38 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     <div id="site-chat-widget" class="chat-widget minimized" data-page="manga">
       <div class="chat-header">
         <strong>Sohbet</strong>
-        <button class="btn-close btn-close-white" type="button" aria-label="Kapat"></button>
+        <button class="nav-trigger" type="button" aria-label="Kapat" data-chat-close><i class="bi bi-x-lg"></i></button>
       </div>
       <div class="chat-body">
         <div class="chat-messages" id="chat-messages"></div>
       </div>
       <div class="chat-footer">
         <?php if ($user): ?>
-          <form id="chat-form" class="d-flex gap-2">
-            <input type="text" class="form-control" name="message" placeholder="Mesaj yaz..." autocomplete="off" required>
+          <form id="chat-form" class="flex gap-3">
+            <input type="text" class="w-full" name="message" placeholder="Mesaj yaz..." autocomplete="off" required>
             <button class="btn btn-primary" type="submit">Gönder</button>
           </form>
         <?php else: ?>
-          <div class="text-center small">Sohbet için <a href="login.php">giriş yapın</a>.</div>
+          <div class="text-center text-sm text-muted">Sohbet için <a href="login.php" class="text-primary">giriş yapın</a>.</div>
         <?php endif; ?>
       </div>
-      <button class="chat-toggle btn btn-primary rounded-circle" type="button" aria-label="Sohbeti aç">💬</button>
+      <button class="chat-toggle btn btn-primary" type="button" aria-label="Sohbeti aç">💬</button>
     </div>
 
-    <footer class="py-4 bg-black text-secondary">
-      <div class="container d-flex flex-column flex-md-row justify-content-between align-items-center gap-3">
+    <footer class="site-footer py-6 mt-12">
+      <div class="mx-auto max-w-6xl px-4 flex flex-col gap-4 md:flex-row md:items-center md:justify-between text-muted">
         <small><?= $footerText !== '' ? $footerText : htmlspecialchars($defaultFooter) ?></small>
         <?php if (!empty($footerMenuItems)): ?>
-          <ul class="nav footer-menu">
+          <ul class="footer-menu">
             <?php foreach ($footerMenuItems as $item): ?>
-              <li class="nav-item"><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
+              <li><a class="nav-link" href="<?= htmlspecialchars($item['url']) ?>" target="<?= htmlspecialchars($item['target']) ?>"><?= htmlspecialchars($item['label']) ?></a></li>
             <?php endforeach; ?>
           </ul>
         <?php endif; ?>
       </div>
       <?php if (!empty($ads['footer'])): ?>
-        <div class="container mt-3">
-          <div class="ad-slot ad-slot--footer text-center">
+        <div class="mx-auto max-w-6xl px-4 mt-4">
+          <div class="ad-slot">
             <?= $ads['footer'] ?>
           </div>
         </div>
@@ -166,7 +167,6 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
     </footer>
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
       window.currentUser = <?= json_encode($user ? [
           'id' => $user['id'],
