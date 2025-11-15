@@ -7,7 +7,7 @@ $(function () {
   const messagesContainer = widget.find('#chat-messages');
   const form = widget.find('#chat-form');
   const toggleButton = widget.find('.chat-toggle');
-  const closeButton = widget.find('.btn-close');
+  const closeButton = widget.find('[data-chat-close]');
   const page = widget.data('page');
 
   if (page === 'index') {
@@ -17,7 +17,7 @@ $(function () {
   function renderMessages(messages) {
     messagesContainer.empty();
     if (!messages.length) {
-      messagesContainer.append('<div class="text-secondary small">Henüz mesaj yok.</div>');
+      messagesContainer.append('<div class="text-sm text-muted">Henüz mesaj yok.</div>');
       return;
     }
 
@@ -25,7 +25,7 @@ $(function () {
       const item = $('<div class="chat-message">');
       item.append(`<div class="chat-author">${escapeHtml(message.username)}</div>`);
       item.append(`<div class="chat-text">${escapeHtml(message.message)}</div>`);
-      item.append(`<div class="chat-time text-secondary small">${new Date(message.created_at).toLocaleTimeString('tr-TR')}</div>`);
+      item.append(`<div class="chat-time text-sm text-muted">${new Date(message.created_at).toLocaleTimeString('tr-TR')}</div>`);
       messagesContainer.append(item);
     });
 
@@ -95,7 +95,7 @@ $(function () {
   startPolling();
 
   function updateKiBalance(balance) {
-    $('#nav-ki-balance').text(balance);
+    $('#nav-ki-balance, #nav-ki-balance-mobile').text(balance);
     if (window.currentUser) {
       window.currentUser.ki_balance = balance;
     }
