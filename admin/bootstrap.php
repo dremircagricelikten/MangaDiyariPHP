@@ -15,6 +15,10 @@ require_once __DIR__ . '/../src/MenuRepository.php';
 require_once __DIR__ . '/../src/KiRepository.php';
 require_once __DIR__ . '/../src/PageRepository.php';
 require_once __DIR__ . '/../src/InteractionRepository.php';
+require_once __DIR__ . '/../src/PostRepository.php';
+require_once __DIR__ . '/../src/TaxonomyRepository.php';
+require_once __DIR__ . '/../src/MediaRepository.php';
+require_once __DIR__ . '/../src/RoleRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\SiteContext;
@@ -28,6 +32,10 @@ use MangaDiyari\Core\MenuRepository;
 use MangaDiyari\Core\KiRepository;
 use MangaDiyari\Core\PageRepository;
 use MangaDiyari\Core\InteractionRepository;
+use MangaDiyari\Core\PostRepository;
+use MangaDiyari\Core\TaxonomyRepository;
+use MangaDiyari\Core\MediaRepository;
+use MangaDiyari\Core\RoleRepository;
 
 Auth::start();
 if (!Auth::checkRole(['admin', 'editor'])) {
@@ -51,6 +59,11 @@ $menuRepo = new MenuRepository($pdo);
 $kiRepo = new KiRepository($pdo);
 $pageRepo = new PageRepository($pdo);
 $interactionRepo = new InteractionRepository($pdo);
+$postRepo = new PostRepository($pdo);
+$taxonomyRepo = new TaxonomyRepository($pdo);
+$mediaRepo = new MediaRepository($pdo);
+$roleRepo = new RoleRepository($pdo);
+$userRepo->setRoleRepository($roleRepo);
 
 $dashboardStats = [
     'manga_total' => $mangaRepo->count(),

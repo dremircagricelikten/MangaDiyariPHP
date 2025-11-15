@@ -9,8 +9,15 @@ use PDOException;
 
 class UserRepository
 {
+    private ?RoleRepository $roleRepository = null;
+
     public function __construct(private PDO $pdo)
     {
+    }
+
+    public function setRoleRepository(RoleRepository $roleRepository): void
+    {
+        $this->roleRepository = $roleRepository;
     }
 
     public function create(array $data): array
@@ -27,6 +34,8 @@ class UserRepository
         if ($username === '' || $email === '' || $password === '') {
             throw new InvalidArgumentException('Kullanıcı adı, e-posta ve parola zorunludur.');
         }
+
+        $this->assertValidRole($role);
 
         if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
             throw new InvalidArgumentException('Geçerli bir e-posta adresi giriniz.');
@@ -173,10 +182,7 @@ class UserRepository
 
     public function updateRole(int $id, string $role): array
     {
-        $allowed = ['admin', 'editor', 'member'];
-        if (!in_array($role, $allowed, true)) {
-            throw new InvalidArgumentException('Geçersiz rol seçimi.');
-        }
+        $this->assertValidRole($role);
 
         $user = $this->findById($id);
         if (!$user) {
@@ -216,9 +222,7 @@ class UserRepository
         ];
 
         if ($role !== null) {
-            if (!in_array($role, ['admin', 'editor', 'member'], true)) {
-                throw new InvalidArgumentException('Geçersiz rol seçimi.');
-            }
+            $this->assertValidRole($role);
             $fields[] = 'role = :role';
             $params[':role'] = $role;
         }
@@ -308,5 +312,25 @@ class UserRepository
         $stmt->execute($params);
 
         return (int) $stmt->fetchColumn();
+    }
+
+    private function assertValidRole(string $role): void
+    {
+        $role = trim($role);
+        if ($role === '') {
+            throw new InvalidArgumentException('Geçersiz rol seçimi.');
+        }
+
+        if ($this->roleRepository) {
+            if ($this->roleRepository->find($role) === null) {
+                throw new InvalidArgumentException('Tanımlı olmayan bir rol seçtiniz.');
+            }
+
+            return;
+        }
+
+        if (!in_array($role, ['admin', 'editor', 'member'], true)) {
+            throw new InvalidArgumentException('Geçersiz rol seçimi.');
+        }
     }
 }

@@ -298,6 +298,58 @@ class Database
             updated_at DATETIME NOT NULL
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
 
+        $pdo->exec('CREATE TABLE IF NOT EXISTS posts (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            title VARCHAR(255) NOT NULL,
+            slug VARCHAR(255) NOT NULL UNIQUE,
+            excerpt TEXT NULL,
+            content LONGTEXT NOT NULL,
+            status VARCHAR(32) NOT NULL DEFAULT "draft",
+            featured_image TEXT NULL,
+            author_id INT UNSIGNED NULL,
+            category_slugs LONGTEXT NULL,
+            tag_slugs LONGTEXT NULL,
+            published_at DATETIME NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            CONSTRAINT fk_post_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS taxonomies (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            taxonomy VARCHAR(64) NOT NULL,
+            name VARCHAR(191) NOT NULL,
+            slug VARCHAR(191) NOT NULL,
+            description TEXT NULL,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL,
+            UNIQUE KEY uniq_taxonomy_slug (taxonomy, slug)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS media_items (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            filename VARCHAR(255) NOT NULL,
+            path TEXT NOT NULL,
+            mime_type VARCHAR(191) NOT NULL,
+            size_bytes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+            title VARCHAR(255) NULL,
+            alt_text TEXT NULL,
+            created_by INT UNSIGNED NULL,
+            created_at DATETIME NOT NULL,
+            CONSTRAINT fk_media_user FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE SET NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS roles (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            role_key VARCHAR(64) NOT NULL UNIQUE,
+            label VARCHAR(191) NOT NULL,
+            capabilities LONGTEXT NOT NULL DEFAULT "[]",
+            is_system TINYINT(1) NOT NULL DEFAULT 0,
+            sort_order INT NOT NULL DEFAULT 0,
+            created_at DATETIME NOT NULL,
+            updated_at DATETIME NOT NULL
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
         $pdo->exec('CREATE TABLE IF NOT EXISTS menus (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             name VARCHAR(191) NOT NULL,
@@ -529,6 +581,56 @@ class Database
             updated_at TEXT NOT NULL
         )');
 
+        $pdo->exec('CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT NOT NULL,
+            slug TEXT NOT NULL UNIQUE,
+            excerpt TEXT,
+            content TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT "draft",
+            featured_image TEXT,
+            author_id INTEGER,
+            category_slugs TEXT,
+            tag_slugs TEXT,
+            published_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS taxonomies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            taxonomy TEXT NOT NULL,
+            name TEXT NOT NULL,
+            slug TEXT NOT NULL,
+            description TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(taxonomy, slug)
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS media_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT NOT NULL,
+            path TEXT NOT NULL,
+            mime_type TEXT NOT NULL,
+            size_bytes INTEGER NOT NULL DEFAULT 0,
+            title TEXT,
+            alt_text TEXT,
+            created_by INTEGER,
+            created_at TEXT NOT NULL
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS roles (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            role_key TEXT NOT NULL UNIQUE,
+            label TEXT NOT NULL,
+            capabilities TEXT NOT NULL DEFAULT "[]",
+            is_system INTEGER NOT NULL DEFAULT 0,
+            sort_order INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )');
+
         $pdo->exec('CREATE TABLE IF NOT EXISTS menus (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -645,6 +747,47 @@ class Database
 
         foreach ($settings as $key => $value) {
             self::upsertSetting($pdo, $driver, (string) $key, (string) $value);
+        }
+
+        $defaultRoles = [
+            [
+                'role_key' => 'admin',
+                'label' => 'Yönetici',
+                'capabilities' => json_encode(['manage_site', 'manage_users', 'manage_content', 'manage_market', 'manage_integrations'], JSON_UNESCAPED_UNICODE),
+                'is_system' => 1,
+                'sort_order' => 1,
+            ],
+            [
+                'role_key' => 'editor',
+                'label' => 'Editör',
+                'capabilities' => json_encode(['manage_content', 'manage_comments', 'manage_media'], JSON_UNESCAPED_UNICODE),
+                'is_system' => 1,
+                'sort_order' => 2,
+            ],
+            [
+                'role_key' => 'member',
+                'label' => 'Üye',
+                'capabilities' => json_encode(['read'], JSON_UNESCAPED_UNICODE),
+                'is_system' => 1,
+                'sort_order' => 3,
+            ],
+        ];
+
+        foreach ($defaultRoles as $role) {
+            $stmt = $pdo->prepare('SELECT COUNT(*) FROM roles WHERE role_key = :key');
+            $stmt->execute([':key' => $role['role_key']]);
+            if ((int) $stmt->fetchColumn() === 0) {
+                $insert = $pdo->prepare('INSERT INTO roles (role_key, label, capabilities, is_system, sort_order, created_at, updated_at) VALUES (:key, :label, :capabilities, :is_system, :sort_order, :created, :updated)');
+                $insert->execute([
+                    ':key' => $role['role_key'],
+                    ':label' => $role['label'],
+                    ':capabilities' => $role['capabilities'],
+                    ':is_system' => $role['is_system'],
+                    ':sort_order' => $role['sort_order'],
+                    ':created' => $now,
+                    ':updated' => $now,
+                ]);
+            }
         }
 
         $defaultWidgets = [

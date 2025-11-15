@@ -88,6 +88,65 @@ $defaultStorageDriver = $settingRepo->get('chapter_storage_driver', 'local');
             </form>
           </section>
 
+          <section class="admin-section" id="quick-chapter">
+            <div class="admin-section-header">
+              <div>
+                <span class="eyebrow">Hızlı İşlem</span>
+                <h2>Bölüm Ekle</h2>
+                <p class="text-muted mb-0">Herhangi bir mangaya hızlıca yeni bölüm atayın, WordPress yazı editörü gibi pratik bir akış.</p>
+              </div>
+            </div>
+            <form id="quick-chapter-form" class="card glass-card" enctype="multipart/form-data">
+              <div class="card-body row g-4">
+                <div class="col-lg-4">
+                  <label class="form-label">Manga</label>
+                  <select class="form-select" id="quick-chapter-manga" name="manga_id" required>
+                    <option value="">Seri seçin</option>
+                  </select>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Bölüm No</label>
+                  <input type="text" class="form-control" name="number" id="quick-chapter-number" required>
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Başlık</label>
+                  <input type="text" class="form-control" name="title" id="quick-chapter-title" placeholder="Opsiyonel">
+                </div>
+                <div class="col-md-3">
+                  <label class="form-label">Depolama</label>
+                  <select class="form-select" name="storage_target" id="quick-chapter-storage">
+                    <option value="local">Yerel</option>
+                    <option value="ftp">FTP</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="form-label">Metin İçerik / Not</label>
+                  <textarea class="form-control" rows="3" name="content" id="quick-chapter-content" placeholder="Özet veya ek notlar"></textarea>
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">ZIP Yükle</label>
+                  <input type="file" class="form-control" name="chapter_zip" id="quick-chapter-zip" accept=".zip">
+                </div>
+                <div class="col-md-4">
+                  <label class="form-label">Görseller</label>
+                  <input type="file" class="form-control" name="chapter_files[]" id="quick-chapter-files" accept="image/*" multiple>
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Ki Bedeli</label>
+                  <input type="number" class="form-control" name="ki_cost" id="quick-chapter-ki" min="0" value="0">
+                </div>
+                <div class="col-md-2">
+                  <label class="form-label">Premium (saat)</label>
+                  <input type="number" class="form-control" name="premium_duration_hours" id="quick-chapter-premium" min="0" value="0">
+                </div>
+                <div class="col-12" id="quick-chapter-message"></div>
+              </div>
+              <div class="card-footer d-flex justify-content-end">
+                <button class="btn btn-primary" type="submit"><i class="bi bi-cloud-upload me-1"></i>Bölümü Kaydet</button>
+              </div>
+            </form>
+          </section>
+
           <section class="admin-section">
             <div class="admin-section-header">
               <div>
