@@ -4,12 +4,14 @@ require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/UserRepository.php';
 require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/SiteContext.php';
+require_once __DIR__ . '/../src/FollowRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
 use MangaDiyari\Core\UserRepository;
 use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\SiteContext;
+use MangaDiyari\Core\FollowRepository;
 
 Auth::start();
 if (!Auth::check()) {
@@ -26,6 +28,7 @@ $analytics = $context['analytics'];
 $pdo = Database::getConnection();
 $userRepo = new UserRepository($pdo);
 $settingRepo = new SettingRepository($pdo);
+$followRepo = new FollowRepository($pdo);
 $allSettings = $settingRepo->all();
 $themeDefaults = [
     'primary_color' => '#5f2c82',
@@ -50,6 +53,8 @@ if (!$profileUser) {
 }
 
 unset($profileUser['password_hash']);
+
+$followedSeries = $followRepo->listFollowedByUser((int) $profileUser['id'], 50);
 
 $error = null;
 $success = null;
@@ -209,6 +214,55 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                   <button type="submit" class="btn btn-primary">Profil Bilgilerini Kaydet</button>
                 </div>
               </form>
+            </div>
+          </div>
+
+          <div class="card bg-secondary border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h2 class="h4 mb-0">Takip Ettiğim Seriler</h2>
+                <a class="btn btn-outline-light btn-sm" href="index.php">Serileri keşfet</a>
+              </div>
+              <?php if (!$followedSeries): ?>
+                <p class="text-muted mb-0">Henüz hiçbir seriyi takip etmiyorsunuz. İlginizi çeken serileri keşfetmeye başlayın.</p>
+              <?php else: ?>
+                <div class="list-group list-group-flush">
+                  <?php foreach ($followedSeries as $series): ?>
+                    <?php
+                      $cover = $series['cover_image'] ?? '';
+                      $title = $series['title'] ?? '';
+                      $initial = function_exists('mb_substr') ? mb_substr($title, 0, 1) : substr($title, 0, 1);
+                      $followedAtRaw = $series['followed_at'] ?? null;
+                      $followedAtFormatted = null;
+                      if ($followedAtRaw) {
+                          $timestamp = strtotime($followedAtRaw);
+                          if ($timestamp !== false) {
+                              $followedAtFormatted = date('d.m.Y H:i', $timestamp);
+                          }
+                      }
+                    ?>
+                    <a class="list-group-item list-group-item-action bg-dark text-light d-flex gap-3 align-items-center" href="manga.php?slug=<?= htmlspecialchars($series['slug']) ?>">
+                      <?php if (!empty($cover)): ?>
+                        <img src="<?= htmlspecialchars($cover) ?>" alt="<?= htmlspecialchars($title) ?>" class="rounded" width="56" height="80">
+                      <?php else: ?>
+                        <div class="rounded bg-secondary d-flex align-items-center justify-content-center" style="width: 56px; height: 80px;">
+                          <span class="fw-semibold"><?= htmlspecialchars($initial) ?></span>
+                        </div>
+                      <?php endif; ?>
+                      <div class="flex-grow-1">
+                        <div class="fw-semibold"><?= htmlspecialchars($title) ?></div>
+                        <?php if (!empty($series['status'])): ?>
+                          <div class="small text-secondary text-uppercase">Durum: <?= htmlspecialchars($series['status']) ?></div>
+                        <?php endif; ?>
+                        <?php if ($followedAtFormatted): ?>
+                          <div class="small text-muted">Takibe alındı: <?= htmlspecialchars($followedAtFormatted) ?></div>
+                        <?php endif; ?>
+                      </div>
+                      <span class="badge bg-primary">Takip</span>
+                    </a>
+                  <?php endforeach; ?>
+                </div>
+              <?php endif; ?>
             </div>
           </div>
 

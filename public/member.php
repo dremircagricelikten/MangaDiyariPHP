@@ -4,12 +4,14 @@ require_once __DIR__ . '/../src/Database.php';
 require_once __DIR__ . '/../src/UserRepository.php';
 require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/SiteContext.php';
+require_once __DIR__ . '/../src/FollowRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
 use MangaDiyari\Core\UserRepository;
 use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\SiteContext;
+use MangaDiyari\Core\FollowRepository;
 
 Auth::start();
 $currentUser = Auth::user();
@@ -30,6 +32,7 @@ $analytics = $context['analytics'];
 $pdo = Database::getConnection();
 $userRepo = new UserRepository($pdo);
 $settingRepo = new SettingRepository($pdo);
+$followRepo = new FollowRepository($pdo);
 $allSettings = $settingRepo->all();
 $themeDefaults = [
     'primary_color' => '#5f2c82',
@@ -49,6 +52,7 @@ $profile = $userRepo->findByUsername($username);
 $notFound = false;
 $joinDateFormatted = null;
 $roleLabel = 'Üye';
+$followedSeries = [];
 
 if (!$profile || (int) ($profile['is_active'] ?? 1) !== 1) {
     http_response_code(404);
@@ -63,6 +67,7 @@ if (!$profile || (int) ($profile['is_active'] ?? 1) !== 1) {
         'member' => 'Üye',
     ];
     $roleLabel = $roleLabels[$profile['role']] ?? 'Üye';
+    $followedSeries = $followRepo->listFollowedByUser((int) $profile['id'], 12);
 }
 
 $primaryMenuItems = $menus['primary']['items'] ?? [];
@@ -144,6 +149,35 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
                   </div>
                 <?php else: ?>
                   <p class="text-secondary small mb-0 mt-4">Bu üye henüz bir biyografi eklemedi.</p>
+                <?php endif; ?>
+
+                <?php if (!empty($followedSeries)): ?>
+                  <hr class="border-light border-opacity-25 my-4">
+                  <div>
+                    <h2 class="h5 mb-3">Takip Ettiği Seriler</h2>
+                    <div class="row g-3">
+                      <?php foreach ($followedSeries as $series): ?>
+                        <?php
+                          $cover = $series['cover_image'] ?? '';
+                          $title = $series['title'] ?? '';
+                          $slug = $series['slug'] ?? '';
+                        ?>
+                        <div class="col-sm-6 col-lg-4">
+                          <a href="manga.php?slug=<?= htmlspecialchars($slug) ?>" class="card bg-dark text-light h-100 text-decoration-none">
+                            <?php if ($cover): ?>
+                              <img src="<?= htmlspecialchars($cover) ?>" alt="<?= htmlspecialchars($title) ?>" class="card-img-top" style="height: 160px; object-fit: cover;">
+                            <?php endif; ?>
+                            <div class="card-body p-3">
+                              <h3 class="h6 mb-1 text-light"><?= htmlspecialchars($title) ?></h3>
+                              <?php if (!empty($series['status'])): ?>
+                                <div class="small text-secondary text-uppercase">Durum: <?= htmlspecialchars($series['status']) ?></div>
+                              <?php endif; ?>
+                            </div>
+                          </a>
+                        </div>
+                      <?php endforeach; ?>
+                    </div>
+                  </div>
                 <?php endif; ?>
               </div>
             </article>

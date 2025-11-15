@@ -14,6 +14,7 @@ require_once __DIR__ . '/../src/SettingRepository.php';
 require_once __DIR__ . '/../src/KiRepository.php';
 require_once __DIR__ . '/../src/InteractionRepository.php';
 require_once __DIR__ . '/../src/ReadingAnalyticsRepository.php';
+require_once __DIR__ . '/../src/FollowRepository.php';
 
 use MangaDiyari\Core\Auth;
 use MangaDiyari\Core\Database;
@@ -24,6 +25,7 @@ use MangaDiyari\Core\SettingRepository;
 use MangaDiyari\Core\KiRepository;
 use MangaDiyari\Core\InteractionRepository;
 use MangaDiyari\Core\ReadingAnalyticsRepository;
+use MangaDiyari\Core\FollowRepository;
 
 try {
     $pdo = Database::getConnection();
@@ -34,6 +36,7 @@ try {
     $kiRepo = new KiRepository($pdo);
     $interactionRepo = new InteractionRepository($pdo);
     $readingRepo = new ReadingAnalyticsRepository($pdo);
+    $followRepo = new FollowRepository($pdo);
 } catch (Throwable $e) {
     http_response_code(500);
     echo json_encode(['error' => $e->getMessage()]);
@@ -82,8 +85,22 @@ try {
                 echo json_encode(['error' => 'Manga bulunamadı']);
                 break;
             }
-            $chapters = $chapterRepo->listByManga((int) $manga['id']);
-            echo json_encode(['data' => $manga, 'chapters' => $chapters]);
+            $mangaId = (int) $manga['id'];
+            $chapters = $chapterRepo->listByManga($mangaId);
+            $isFollowing = false;
+            if ($currentUserId) {
+                $isFollowing = $followRepo->isFollowing((int) $currentUserId, $mangaId);
+            }
+            $followers = $followRepo->countFollowers($mangaId);
+
+            echo json_encode([
+                'data' => $manga,
+                'chapters' => $chapters,
+                'follow' => [
+                    'following' => $isFollowing,
+                    'total' => $followers,
+                ],
+            ]);
             break;
         case 'chapter':
             $slug = $_GET['slug'] ?? '';
@@ -144,6 +161,46 @@ try {
                 'status' => $status ?: null,
             ]);
             echo json_encode(['data' => $chapters]);
+            break;
+        case 'follow-manga':
+            requireLogin();
+            $mangaId = isset($_POST['manga_id']) ? (int) $_POST['manga_id'] : 0;
+            if ($mangaId <= 0) {
+                throw new InvalidArgumentException('Geçersiz seri.');
+            }
+
+            $manga = $mangaRepo->findById($mangaId);
+            if (!$manga) {
+                throw new InvalidArgumentException('Seri bulunamadı.');
+            }
+
+            $followRepo->follow((int) $currentUserId, $mangaId);
+            $followers = $followRepo->countFollowers($mangaId);
+
+            echo json_encode([
+                'message' => 'Seri takip listesine eklendi.',
+                'followers' => $followers,
+            ]);
+            break;
+        case 'unfollow-manga':
+            requireLogin();
+            $mangaId = isset($_POST['manga_id']) ? (int) $_POST['manga_id'] : 0;
+            if ($mangaId <= 0) {
+                throw new InvalidArgumentException('Geçersiz seri.');
+            }
+
+            $manga = $mangaRepo->findById($mangaId);
+            if (!$manga) {
+                throw new InvalidArgumentException('Seri bulunamadı.');
+            }
+
+            $followRepo->unfollow((int) $currentUserId, $mangaId);
+            $followers = $followRepo->countFollowers($mangaId);
+
+            echo json_encode([
+                'message' => 'Seri takip listenizden kaldırıldı.',
+                'followers' => $followers,
+            ]);
             break;
         case 'reading-history':
             requireLogin();

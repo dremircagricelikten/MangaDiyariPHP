@@ -264,6 +264,16 @@ class Database
             CONSTRAINT fk_reaction_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
 
+        $pdo->exec('CREATE TABLE IF NOT EXISTS manga_follows (
+            id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            user_id INT UNSIGNED NOT NULL,
+            manga_id INT UNSIGNED NOT NULL,
+            created_at DATETIME NOT NULL,
+            UNIQUE KEY uniq_follow (user_id, manga_id),
+            CONSTRAINT fk_follow_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            CONSTRAINT fk_follow_manga FOREIGN KEY (manga_id) REFERENCES mangas(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci');
+
         $pdo->exec('CREATE TABLE IF NOT EXISTS chat_messages (
             id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             user_id INT UNSIGNED NOT NULL,
@@ -545,6 +555,16 @@ class Database
             UNIQUE(comment_id, user_id),
             FOREIGN KEY(comment_id) REFERENCES comments(id) ON DELETE CASCADE,
             FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+        )');
+
+        $pdo->exec('CREATE TABLE IF NOT EXISTS manga_follows (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            manga_id INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(user_id, manga_id),
+            FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY(manga_id) REFERENCES mangas(id) ON DELETE CASCADE
         )');
 
         $pdo->exec('CREATE TABLE IF NOT EXISTS chat_messages (
