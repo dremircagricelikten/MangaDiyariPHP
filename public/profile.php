@@ -212,6 +212,16 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
             </div>
           </div>
 
+          <div class="card bg-secondary border-0 shadow-sm mb-4">
+            <div class="card-body p-4">
+              <div class="d-flex align-items-center justify-content-between mb-3">
+                <h2 class="h4 mb-0">Okuma Geçmişi</h2>
+              </div>
+              <p id="reading-history-status" class="text-muted small mb-0">Okuma geçmişiniz yükleniyor...</p>
+            </div>
+            <ul id="reading-history-list" class="list-group list-group-flush"></ul>
+          </div>
+
           <div class="card bg-secondary border-0 shadow-sm">
             <div class="card-body p-4">
               <h2 class="h4 mb-3">Parolayı Güncelle</h2>
@@ -261,5 +271,124 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/theme.js"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', () => {
+        const historyList = document.getElementById('reading-history-list');
+        const historyStatus = document.getElementById('reading-history-status');
+
+        if (!historyList || !historyStatus) {
+          return;
+        }
+
+        const formatChapterNumber = (value) => {
+          if (typeof value === 'number') {
+            return Number.isInteger(value) ? value.toString() : value.toString();
+          }
+          const numeric = Number(value);
+          if (!Number.isNaN(numeric)) {
+            return Number.isInteger(numeric) ? numeric.toString() : value;
+          }
+          return value;
+        };
+
+        const formatDate = (value) => {
+          if (!value) {
+            return '';
+          }
+          const normalized = value.replace(' ', 'T');
+          const date = new Date(normalized);
+          if (Number.isNaN(date.getTime())) {
+            return value;
+          }
+          return date.toLocaleString('tr-TR');
+        };
+
+        const renderHistory = (items) => {
+          historyList.innerHTML = '';
+
+          if (!items || items.length === 0) {
+            historyStatus.textContent = 'Henüz okuma geçmişiniz yok.';
+            historyStatus.classList.remove('text-danger');
+            historyStatus.classList.add('text-muted');
+            historyStatus.classList.remove('d-none');
+            return;
+          }
+
+          historyStatus.classList.add('d-none');
+
+          items.forEach((item) => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item bg-transparent border-secondary text-light';
+
+            const wrapper = document.createElement('div');
+            wrapper.className = 'd-flex align-items-center gap-3';
+
+            if (item.cover_image) {
+              const image = document.createElement('img');
+              image.src = item.cover_image;
+              image.alt = item.manga_title || 'Kapak görseli';
+              image.width = 56;
+              image.height = 80;
+              image.loading = 'lazy';
+              image.className = 'rounded object-fit-cover flex-shrink-0';
+              wrapper.appendChild(image);
+            }
+
+            const content = document.createElement('div');
+            content.className = 'flex-grow-1';
+
+            const chapterLink = document.createElement('a');
+            const chapterNumber = formatChapterNumber(item.number);
+            chapterLink.href = `chapter.php?slug=${encodeURIComponent(item.manga_slug)}&chapter=${encodeURIComponent(chapterNumber)}`;
+            chapterLink.className = 'text-decoration-none text-light fw-semibold';
+            const linkParts = [];
+            linkParts.push(item.manga_title || 'Manga');
+            if (chapterNumber !== '') {
+              linkParts.push(`Bölüm ${chapterNumber}`);
+            }
+            if (item.chapter_title) {
+              linkParts.push(item.chapter_title);
+            }
+            chapterLink.textContent = linkParts.join(' - ');
+
+            const meta = document.createElement('div');
+            meta.className = 'small text-muted';
+            meta.textContent = `Son okuma: ${formatDate(item.last_read_at)}`;
+
+            content.appendChild(chapterLink);
+            content.appendChild(meta);
+
+            wrapper.appendChild(content);
+            li.appendChild(wrapper);
+            historyList.appendChild(li);
+          });
+        };
+
+        const showError = (message) => {
+          historyStatus.textContent = message;
+          historyStatus.classList.remove('text-muted');
+          historyStatus.classList.add('text-danger');
+          historyStatus.classList.remove('d-none');
+          historyList.innerHTML = '';
+        };
+
+        fetch('api.php?action=reading-history&limit=10', { credentials: 'same-origin' })
+          .then((response) => {
+            if (!response.ok) {
+              throw new Error('Okuma geçmişi alınamadı.');
+            }
+            return response.json();
+          })
+          .then((payload) => {
+            if (!payload || !Array.isArray(payload.data)) {
+              throw new Error('Beklenmeyen yanıt alındı.');
+            }
+            renderHistory(payload.data);
+          })
+          .catch((error) => {
+            showError(error.message || 'Okuma geçmişi alınamadı.');
+          });
+      });
+    </script>
   </body>
 </html>

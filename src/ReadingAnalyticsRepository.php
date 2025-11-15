@@ -103,6 +103,45 @@ class ReadingAnalyticsRepository
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getUserHistory(int $userId, int $limit = 10): array
+    {
+        if ($userId <= 0) {
+            return [];
+        }
+
+        $limit = max(1, $limit);
+
+        $query = 'SELECT chapters.id AS chapter_id, chapters.number, chapters.title AS chapter_title, chapters.ki_cost,
+                mangas.id AS manga_id, mangas.title AS manga_title, mangas.slug AS manga_slug, mangas.cover_image,
+                MAX(chapter_reads.read_at) AS last_read_at
+            FROM chapter_reads
+            INNER JOIN chapters ON chapters.id = chapter_reads.chapter_id
+            INNER JOIN mangas ON mangas.id = chapter_reads.manga_id
+            WHERE chapter_reads.user_id = :user_id
+            GROUP BY chapters.id, chapters.number, chapters.title, chapters.ki_cost,
+                mangas.id, mangas.title, mangas.slug, mangas.cover_image
+            ORDER BY last_read_at DESC
+            LIMIT :limit';
+
+        $stmt = $this->db->prepare($query);
+        $stmt->bindValue(':user_id', $userId, PDO::PARAM_INT);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+
+        return array_map(function (array $row): array {
+            $row['chapter_id'] = (int) $row['chapter_id'];
+            $row['manga_id'] = (int) $row['manga_id'];
+            $row['ki_cost'] = isset($row['ki_cost']) ? (int) $row['ki_cost'] : 0;
+            $row['number'] = is_numeric($row['number']) ? (float) $row['number'] : $row['number'];
+            return $row;
+        }, $rows);
+    }
+
+    /**
      * @return array{0:string,1:string}
      */
     private function resolveRange(string $range): array
