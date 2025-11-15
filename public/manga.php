@@ -105,7 +105,18 @@ $footerMenuItems = $menus['footer']['items'] ?? [];
           <?php endif; ?>
         </div>
         <div class="col-md-8">
-          <h1 id="manga-title" class="display-6 mb-3"></h1>
+          <div class="d-flex flex-column flex-md-row align-items-md-center gap-3 mb-3">
+            <h1 id="manga-title" class="display-6 mb-0 flex-grow-1"></h1>
+            <div id="follow-controls" class="d-flex align-items-center gap-2">
+              <button id="follow-btn" type="button" class="btn btn-primary btn-sm">
+                <span class="follow-btn-text">Takip Et</span>
+              </button>
+              <button id="unfollow-btn" type="button" class="btn btn-outline-light btn-sm d-none">
+                <span class="unfollow-btn-text">Destekten Çık</span>
+              </button>
+            </div>
+          </div>
+          <p id="followers-info" class="text-secondary small mb-3 d-none"></p>
           <p id="manga-description" class="lead"></p>
           <h2 class="h4 mt-5">Bölümler</h2>
           <div class="list-group" id="chapter-list"></div>
